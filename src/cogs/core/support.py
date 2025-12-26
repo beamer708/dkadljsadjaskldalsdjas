@@ -348,6 +348,33 @@ class Support(commands.Cog):
     async def send_ticket_opened_message(self, channel: discord.TextChannel, user: discord.User) -> None:
         """Send the initial ticket message in the channel."""
         try:
+            # Ping staff role above the embed so the notification is seen first
+            staff_role = channel.guild.get_role(SUPPORT_STAFF_ROLE_ID) if channel.guild else None
+            if staff_role:
+                try:
+                    await channel.send(
+                        content=staff_role.mention,
+                        allowed_mentions=discord.AllowedMentions(
+                            roles=True, users=False, everyone=False, replied_user=False
+                        ),
+                    )
+                except discord.Forbidden:
+                    logger.warning(
+                        "Missing permission to mention staff role %s in channel %s",
+                        SUPPORT_STAFF_ROLE_ID,
+                        channel.id,
+                    )
+                except Exception as exc:
+                    logger.error(
+                        "Failed to ping staff role %s in channel %s: %s",
+                        SUPPORT_STAFF_ROLE_ID,
+                        channel.id,
+                        exc,
+                        exc_info=True,
+                    )
+            else:
+                logger.warning("Staff role %s not found in guild %s", SUPPORT_STAFF_ROLE_ID, channel.guild.id if channel.guild else "unknown")
+
             embed = self.create_brand_embed(
                 title="Support Ticket Opened",
                 description=f"New support ticket from {user.mention} (`{user.name}`)"
