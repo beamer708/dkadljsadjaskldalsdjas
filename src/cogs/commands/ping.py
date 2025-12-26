@@ -18,7 +18,8 @@ class Ping(commands.Cog):
         """Initialize the Ping cog."""
         self.bot = bot
     
-    @app_commands.command(name="ping", description="Check the bot's latency")
+    @app_commands.command(name="ping", description="Check the bot's latency (Admin only)")
+    @app_commands.checks.has_permissions(administrator=True)
     async def ping_slash(self, interaction: discord.Interaction) -> None:
         """Slash command to check bot latency."""
         # Calculate latency
@@ -33,6 +34,7 @@ class Ping(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=False)
     
     @commands.command(name="ping", aliases=["p"])
+    @commands.has_permissions(administrator=True)
     async def ping_prefix(self, ctx: commands.Context) -> None:
         """Prefix command to check bot latency."""
         # Calculate latency

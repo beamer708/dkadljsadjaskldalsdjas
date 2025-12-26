@@ -109,7 +109,8 @@ class Demo(commands.Cog):
         """Initialize the Demo cog."""
         self.bot = bot
     
-    @app_commands.command(name="demo", description="Demonstrate buttons and select menus")
+    @app_commands.command(name="demo", description="Demonstrate buttons and select menus (Admin only)")
+    @app_commands.checks.has_permissions(administrator=True)
     async def demo_slash(self, interaction: discord.Interaction) -> None:
         """Slash command demonstrating buttons and select menus."""
         embed = info_embed(
@@ -119,13 +120,15 @@ class Demo(commands.Cog):
         view = DemoView()
         await interaction.response.send_message(embed=embed, view=view)
     
-    @app_commands.command(name="modal", description="Demonstrate a modal form")
+    @app_commands.command(name="modal", description="Demonstrate a modal form (Admin only)")
+    @app_commands.checks.has_permissions(administrator=True)
     async def modal_slash(self, interaction: discord.Interaction) -> None:
         """Slash command demonstrating modals."""
         modal = DemoModal()
         await interaction.response.send_modal(modal)
     
-    @app_commands.command(name="autocomplete-demo", description="Demonstrate autocomplete")
+    @app_commands.command(name="autocomplete-demo", description="Demonstrate autocomplete (Admin only)")
+    @app_commands.checks.has_permissions(administrator=True)
     async def autocomplete_demo(
         self,
         interaction: discord.Interaction,
@@ -154,6 +157,7 @@ class Demo(commands.Cog):
         return filtered[:25]  # Discord allows max 25 choices
     
     @app_commands.context_menu(name="Demo Context Menu")
+    @app_commands.checks.has_permissions(administrator=True)
     async def demo_context_menu(
         self,
         interaction: discord.Interaction,
@@ -168,6 +172,7 @@ class Demo(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
     
     @app_commands.context_menu(name="Get User Info")
+    @app_commands.checks.has_permissions(administrator=True)
     async def user_info_context_menu(
         self,
         interaction: discord.Interaction,
@@ -184,6 +189,7 @@ class Demo(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
     
     @commands.command(name="demo", aliases=["d"])
+    @commands.has_permissions(administrator=True)
     async def demo_prefix(self, ctx: commands.Context) -> None:
         """Prefix command demonstrating buttons and select menus."""
         embed = info_embed(
