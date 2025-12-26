@@ -11,6 +11,8 @@ ENV/
 
 # Discord Bot
 config.json
+tickets.json
+transcripts/
 *.log
 
 # IDE

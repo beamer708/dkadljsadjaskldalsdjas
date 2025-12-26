@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 import discord
 from discord.ext import commands
 
-from src.utils.embeds import info_embed, warning_embed
+from src.utils.embeds import info_embed, warning_embed, BRAND_PRIMARY
 
 if TYPE_CHECKING:
     from src.bot import Bot
@@ -171,7 +171,7 @@ class LoggingSystem(commands.Cog):
                 value=f"{member.guild.member_count:,}",
                 inline=True
             )
-            embed.color = discord.Color.green()
+            embed.color = BRAND_PRIMARY
             embed.set_footer(text=f"User ID: {member.id}")
             embed.timestamp = discord.utils.utcnow()
             
@@ -212,7 +212,7 @@ class LoggingSystem(commands.Cog):
                 value=f"{member.guild.member_count:,}",
                 inline=True
             )
-            embed.color = discord.Color.orange()
+            embed.color = BRAND_PRIMARY
             embed.set_footer(text=f"User ID: {member.id}")
             embed.timestamp = discord.utils.utcnow()
             
@@ -270,7 +270,7 @@ class LoggingSystem(commands.Cog):
             if message.embeds:
                 embed.add_field(name="Embeds", value=f"{len(message.embeds)} embed(s)", inline=True)
             
-            embed.color = discord.Color.red()
+            embed.color = BRAND_PRIMARY
             embed.set_footer(text=f"Message ID: {message.id} | User ID: {message.author.id}")
             embed.timestamp = message.created_at
             

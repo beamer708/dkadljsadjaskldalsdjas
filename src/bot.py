@@ -2,6 +2,8 @@
 
 import logging
 import asyncio
+import contextlib
+from itertools import cycle
 from pathlib import Path
 from typing import Optional
 import discord
@@ -41,6 +43,15 @@ class Bot(commands.Bot):
     def __init__(self, config: Config) -> None:
         """Initialize the bot with configuration."""
         self.config = config
+        self.status_task: Optional[asyncio.Task] = None
+        self._status_messages = cycle(
+            [
+                (discord.ActivityType.playing, "Smooth Rides Daily"),
+                (discord.ActivityType.playing, "Stealthy Rides Guaranteed"),
+                (discord.ActivityType.playing, "Safe Public Transit"),
+                (discord.ActivityType.playing, "Message for support"),
+            ]
+        )
         
         # Set up intents
         intents = discord.Intents.default()
@@ -109,6 +120,10 @@ class Bot(commands.Bot):
     async def close(self) -> None:
         """Cleanup when bot is shutting down."""
         logger.info("Shutting down bot...")
+        if self.status_task:
+            self.status_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self.status_task
         await super().close()
     
     async def start(self) -> None:
@@ -121,6 +136,34 @@ class Bot(commands.Bot):
             logger.error(f"Bot crashed: {e}", exc_info=True)
         finally:
             await self.close()
+
+    def start_status_rotation(self) -> None:
+        """Start background status rotation if not already running."""
+        if self.status_task and not self.status_task.done():
+            logger.debug("Status rotation task already running; skipping new start")
+            return
+
+        async def _rotate_statuses() -> None:
+            """Background loop to rotate bot presence."""
+            try:
+                while not self.is_closed():
+                    activity_type, message = next(self._status_messages)
+                    activity = discord.Activity(type=activity_type, name=message)
+                    await self.change_presence(activity=activity, status=discord.Status.online)
+                    logger.info(
+                        "Rotating status set to '%s' (%s)",
+                        message,
+                        activity_type.name,
+                    )
+                    await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                logger.info("Status rotation task cancelled")
+                raise
+            except Exception as exc:
+                logger.error(f"Status rotation task encountered an error: {exc}", exc_info=True)
+
+        self.status_task = asyncio.create_task(_rotate_statuses(), name="status_rotation")
+        logger.info("Started rotating status task")
 
 
 async def main() -> None:

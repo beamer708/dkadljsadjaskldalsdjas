@@ -27,10 +27,11 @@ class Events(commands.Cog):
         logger.info(f"Discord.py version: {discord.__version__}")
         logger.info(f"Connected to {len(self.bot.guilds)} guild(s)")
         logger.info(f"Bot is visible to {len(self.bot.users)} user(s)")
-        
-        # Set bot presence
-        activity = discord.Game(name=f"{self.bot.config.prefix}help")
-        await self.bot.change_presence(activity=activity, status=discord.Status.online)
+
+        # Start rotating presence
+        self.bot.start_status_rotation()
+        rotation_active = self.bot.status_task is not None and not self.bot.status_task.done()
+        logger.info("Status rotation active: %s", rotation_active)
     
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild) -> None:
