@@ -18,6 +18,23 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def get_prefix(bot: commands.Bot, message: discord.Message) -> str:
+    """
+    Get command prefix for a message.
+    
+    Args:
+        bot: The bot instance
+        message: The message to get prefix for
+        
+    Returns:
+        The command prefix string
+    """
+    # Access config from bot instance
+    if hasattr(bot, 'config') and bot.config:
+        return bot.config.prefix
+    return "!"  # Fallback default
+
+
 class Bot(commands.Bot):
     """Main bot class extending discord.py's Bot."""
     
@@ -33,15 +50,11 @@ class Bot(commands.Bot):
         
         # Initialize bot with prefix and intents
         super().__init__(
-            command_prefix=self._get_prefix,
+            command_prefix=get_prefix,
             intents=intents,
             application_id=config.application_id,
             help_command=None,  # Disable default help command (can be added as cog)
         )
-    
-    async def _get_prefix(self, message: discord.Message) -> str:
-        """Dynamic prefix getter (can be per-guild in the future)."""
-        return self.config.prefix
     
     async def setup_hook(self) -> None:
         """Called when the bot is starting up, before on_ready."""

@@ -102,6 +102,39 @@ class DemoModal(Modal, title="Demo Form"):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
+# Context menu commands must be defined at module level, not inside a class
+@app_commands.context_menu(name="Demo Context Menu")
+@app_commands.checks.has_permissions(administrator=True)
+async def demo_context_menu(
+    interaction: discord.Interaction,
+    message: discord.Message
+) -> None:
+    """Context menu command for messages."""
+    embed = info_embed(
+        "Context Menu Used!",
+        f"You right-clicked on a message from {message.author.mention}\n"
+        f"Message content: {message.content[:100]}..."
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@app_commands.context_menu(name="Get User Info")
+@app_commands.checks.has_permissions(administrator=True)
+async def user_info_context_menu(
+    interaction: discord.Interaction,
+    user: discord.User
+) -> None:
+    """Context menu command for users."""
+    embed = info_embed(
+        f"User Info: {user.name}",
+        f"**ID:** {user.id}\n"
+        f"**Created:** {user.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"**Bot:** {'Yes' if user.bot else 'No'}"
+    )
+    embed.set_thumbnail(url=user.display_avatar.url)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
 class Demo(commands.Cog):
     """Demo commands showcasing Discord UI components."""
     
@@ -156,38 +189,6 @@ class Demo(commands.Cog):
         ]
         return filtered[:25]  # Discord allows max 25 choices
     
-    @app_commands.context_menu(name="Demo Context Menu")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def demo_context_menu(
-        self,
-        interaction: discord.Interaction,
-        message: discord.Message
-    ) -> None:
-        """Context menu command for messages."""
-        embed = info_embed(
-            "Context Menu Used!",
-            f"You right-clicked on a message from {message.author.mention}\n"
-            f"Message content: {message.content[:100]}..."
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-    
-    @app_commands.context_menu(name="Get User Info")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def user_info_context_menu(
-        self,
-        interaction: discord.Interaction,
-        user: discord.User
-    ) -> None:
-        """Context menu command for users."""
-        embed = info_embed(
-            f"User Info: {user.name}",
-            f"**ID:** {user.id}\n"
-            f"**Created:** {user.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"**Bot:** {'Yes' if user.bot else 'No'}"
-        )
-        embed.set_thumbnail(url=user.display_avatar.url)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-    
     @commands.command(name="demo", aliases=["d"])
     @commands.has_permissions(administrator=True)
     async def demo_prefix(self, ctx: commands.Context) -> None:
@@ -203,4 +204,7 @@ class Demo(commands.Cog):
 async def setup(bot: "Bot") -> None:
     """Setup function for the Demo cog."""
     await bot.add_cog(Demo(bot))
+    # Register context menu commands manually (must be at module level)
+    bot.tree.add_command(demo_context_menu)
+    bot.tree.add_command(user_info_context_menu)
 
