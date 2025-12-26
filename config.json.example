@@ -1,8 +1,0 @@
-{
-  "token": "YOUR_BOT_TOKEN_HERE",
-  "application_id": "YOUR_APPLICATION_ID_HERE",
-  "dev_guild_id": "YOUR_DEV_GUILD_ID_HERE",
-  "prefix": "!",
-  "sync_commands": true
-}
-
