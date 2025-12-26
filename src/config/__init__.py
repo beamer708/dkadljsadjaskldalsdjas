@@ -24,7 +24,9 @@ class Config:
     
     def _get_config(self, key: str, default: Optional[str] = None, required: bool = True) -> str:
         """
-        Get configuration value from environment variable or config.json.
+        Get configuration value from config.json (prioritized) or environment variable.
+        
+        For the token, only config.json is used (no environment variables).
         
         Args:
             key: Configuration key name
@@ -37,19 +39,35 @@ class Config:
         Raises:
             ValueError: If required key is missing
         """
-        # Try environment variable first (with prefix)
-        env_key = f"DISCORD_{key.upper()}"
-        env_value = os.getenv(env_key)
-        if env_value:
-            return env_value
+        # For token, ONLY use config.json (never environment variables)
+        if key == "token":
+            config_path = Path(__file__).parent.parent.parent / "config.json"
+            if not config_path.exists():
+                raise ValueError(
+                    "config.json not found. Please create config.json with your bot token."
+                )
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                if key not in config or not config[key]:
+                    raise ValueError(
+                        f"Missing required configuration: {key}. "
+                        f"Please add '{key}' to config.json"
+                    )
+                return str(config[key])
         
-        # Try config.json
+        # For other config values: Try config.json first, then environment variables
         config_path = Path(__file__).parent.parent.parent / "config.json"
         if config_path.exists():
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
-                if key in config:
+                if key in config and config[key]:
                     return str(config[key])
+        
+        # Try environment variable as fallback
+        env_key = f"DISCORD_{key.upper()}"
+        env_value = os.getenv(env_key)
+        if env_value:
+            return env_value
         
         # Use default or raise error
         if default is not None:
@@ -58,7 +76,7 @@ class Config:
         if required:
             raise ValueError(
                 f"Missing required configuration: {key}. "
-                f"Set DISCORD_{key.upper()} environment variable or add it to config.json"
+                f"Please add '{key}' to config.json"
             )
         
         return ""
