@@ -172,6 +172,8 @@ async def main() -> None:
         config = Config()
         bot = Bot(config)
         await bot.start()
+    except asyncio.CancelledError:
+        logger.info("Main task cancelled, shutting down cleanly")
     except Exception as e:
         logger.error(f"Failed to start bot: {e}", exc_info=True)
 

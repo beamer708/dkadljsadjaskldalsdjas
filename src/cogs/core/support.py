@@ -34,6 +34,7 @@ class Support(commands.Cog):
         self.tickets: Dict[int, int] = {}  # user_id -> channel_id
         self.channel_to_user: Dict[int, int] = {}  # channel_id -> user_id
         self.closing_channels: set[int] = set()  # Track channels being closed to prevent duplicates
+        self.channel_service: Dict[int, str] = {}  # channel_id -> service name
         # Ensure transcripts directory exists
         TRANSCRIPTS_DIR.mkdir(exist_ok=True)
         self.load_tickets()
@@ -78,18 +79,21 @@ class Support(commands.Cog):
                     data = json.load(f)
                     self.tickets = {int(k): int(v) for k, v in data.get("tickets", {}).items()}
                     self.channel_to_user = {int(k): int(v) for k, v in data.get("channel_to_user", {}).items()}
+                    self.channel_service = {int(k): v for k, v in data.get("channel_service", {}).items()}
                 logger.info(f"Loaded {len(self.tickets)} ticket(s) from storage")
         except Exception as e:
             logger.error(f"Failed to load tickets: {e}", exc_info=True)
             self.tickets = {}
             self.channel_to_user = {}
+            self.channel_service = {}
     
     def save_tickets(self) -> None:
         """Save ticket mappings to file."""
         try:
             data = {
                 "tickets": {str(k): str(v) for k, v in self.tickets.items()},
-                "channel_to_user": {str(k): str(v) for k, v in self.channel_to_user.items()}
+                "channel_to_user": {str(k): str(v) for k, v in self.channel_to_user.items()},
+                "channel_service": {str(k): v for k, v in self.channel_service.items()},
             }
             with open(TICKETS_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
@@ -345,7 +349,12 @@ class Support(commands.Cog):
             logger.error(f"Failed to generate transcript for channel {channel.id}: {e}", exc_info=True)
             return None
     
-    async def send_ticket_opened_message(self, channel: discord.TextChannel, user: discord.User) -> None:
+    async def send_ticket_opened_message(
+        self,
+        channel: discord.TextChannel,
+        user: discord.User,
+        service_name: Optional[str] = None
+    ) -> None:
         """Send the initial ticket message in the channel."""
         try:
             # Ping staff role above the embed so the notification is seen first
@@ -380,6 +389,8 @@ class Support(commands.Cog):
                 description=f"New support ticket from {user.mention} (`{user.name}`)"
             )
             embed.add_field(name="User ID", value=f"`{user.id}`", inline=True)
+            if service_name:
+                embed.add_field(name="Service", value=service_name, inline=True)
             embed.add_field(name="Account Created", value=f"<t:{int(user.created_at.timestamp())}:R>", inline=True)
             embed.set_footer(text=f"Reply in this channel to send messages to the user")
             embed.timestamp = discord.utils.utcnow()
@@ -388,7 +399,12 @@ class Support(commands.Cog):
         except Exception as e:
             logger.error(f"Failed to send ticket opened message: {e}", exc_info=True)
     
-    async def send_user_confirmation(self, user: discord.User, channel: discord.TextChannel) -> None:
+    async def send_user_confirmation(
+        self,
+        user: discord.User,
+        channel: discord.TextChannel,
+        service_name: Optional[str] = None
+    ) -> None:
         """Send confirmation DM to the user that their ticket was created."""
         try:
             embed = self.create_brand_embed(
@@ -401,6 +417,8 @@ class Support(commands.Cog):
                     "You can continue messaging me here, and all your messages will be forwarded to our support team."
                 )
             )
+            if service_name:
+                embed.add_field(name="Service", value=service_name, inline=False)
             embed.set_footer(text="U-Drive Support")
             embed.timestamp = discord.utils.utcnow()
             
@@ -447,12 +465,14 @@ class Support(commands.Cog):
                     logger.warning(f"Ticket channel {channel_id} no longer exists, removing mapping")
                     self.tickets.pop(user.id, None)
                     self.channel_to_user.pop(channel_id, None)
+                    self.channel_service.pop(channel_id, None)
                     self.save_tickets()
             except discord.NotFound:
                 # Channel was deleted, remove from mapping
                 logger.info(f"Ticket channel {channel_id} not found, removing mapping")
                 self.tickets.pop(user.id, None)
                 self.channel_to_user.pop(channel_id, None)
+                self.channel_service.pop(channel_id, None)
                 self.save_tickets()
             except Exception as e:
                 logger.error(f"Error checking existing ticket for user {user.id}: {e}", exc_info=True)
@@ -460,7 +480,7 @@ class Support(commands.Cog):
         # Create new ticket for first message
         await self.create_new_ticket(message, user)
     
-    async def create_new_ticket(self, message: discord.Message, user: discord.User) -> None:
+    async def create_new_ticket(self, message: discord.Message, user: discord.User, service_name: Optional[str] = None) -> None:
         """Create a new support ticket from a user's DM."""
         # Find the support server (use the first guild the bot is in, or configurable)
         # For now, use dev_guild_id if available, otherwise first guild
@@ -500,16 +520,84 @@ class Support(commands.Cog):
         # Store ticket mapping
         self.tickets[user.id] = channel.id
         self.channel_to_user[channel.id] = user.id
+        if service_name:
+            self.channel_service[channel.id] = service_name
         self.save_tickets()
         
         # Send initial ticket message
-        await self.send_ticket_opened_message(channel, user)
+        await self.send_ticket_opened_message(channel, user, service_name=service_name)
         
         # Relay the user's initial message
         await self.relay_dm_to_ticket(message, channel, user)
         
         # Send confirmation to user
-        await self.send_user_confirmation(user, channel)
+        await self.send_user_confirmation(user, channel, service_name=service_name)
+    
+    async def create_ticket_from_order(
+        self,
+        user: discord.User,
+        guild: discord.Guild,
+        service_name: str,
+        details: Optional[dict[str, str]] = None
+    ) -> Optional[discord.TextChannel]:
+        """
+        Create a ticket for an order-based request and tag it with the service name.
+        
+        Args:
+            user: The user placing the order
+            guild: Guild to create the ticket in
+            service_name: Selected service name
+            details: Optional dict with additional context (e.g., roblox_username, location)
+            
+        Returns:
+            The created ticket channel or None on failure
+        """
+        if user.id in self.tickets:
+            existing_channel_id = self.tickets[user.id]
+            existing_channel = self.bot.get_channel(existing_channel_id)
+            if existing_channel is None:
+                try:
+                    existing_channel = await self.bot.fetch_channel(existing_channel_id)
+                except Exception:
+                    existing_channel = None
+            if existing_channel:
+                logger.info("User %s already has an open ticket (%s); skipping new order ticket", user.id, existing_channel.id)
+                return existing_channel
+        
+        channel = await self.create_ticket_channel(guild, user)
+        if channel is None:
+            return None
+        
+        self.tickets[user.id] = channel.id
+        self.channel_to_user[channel.id] = user.id
+        self.channel_service[channel.id] = service_name
+        self.save_tickets()
+        
+        try:
+            await channel.edit(topic=f"Service: {service_name}")
+        except Exception as exc:
+            logger.warning("Failed to set topic for channel %s: %s", channel.id, exc)
+        
+        await self.send_ticket_opened_message(channel, user, service_name=service_name)
+        
+        # Send details to staff channel
+        if details:
+            detail_lines = []
+            if roblox_username := details.get("roblox_username"):
+                detail_lines.append(f"**Roblox Username:** {roblox_username}")
+            if location := details.get("location"):
+                detail_lines.append(f"**Location:** {location}")
+            detail_body = "\n".join(detail_lines) if detail_lines else "No additional details provided."
+            
+            detail_embed = self.create_brand_embed(
+                title=f"Order Details - {service_name}",
+                description=detail_body
+            )
+            detail_embed.set_author(name=str(user), icon_url=user.display_avatar.url)
+            await channel.send(embed=detail_embed)
+        
+        await self.send_user_confirmation(user, channel, service_name=service_name)
+        return channel
     
     async def relay_dm_to_ticket(
         self,
@@ -582,6 +670,7 @@ class Support(commands.Cog):
             logger.warning(f"User {user_id} not found, removing ticket mapping")
             self.tickets.pop(user_id, None)
             self.channel_to_user.pop(channel.id, None)
+            self.channel_service.pop(channel.id, None)
             self.save_tickets()
             return
         except Exception as e:
@@ -756,6 +845,7 @@ class Support(commands.Cog):
             # Remove from ticket mappings
             self.tickets.pop(user_id, None)
             self.channel_to_user.pop(channel_id, None)
+            self.channel_service.pop(channel_id, None)
             self.save_tickets()
             
             # Delete the channel
