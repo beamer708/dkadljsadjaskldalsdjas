@@ -1,7 +1,9 @@
-"""Independent order ticket system using DM-only tickets (separate from support)."""
+"""Independent order ticket system using DM intake and server channels (separate from support)."""
 
 import asyncio
 import logging
+import secrets
+import string
 from typing import TYPE_CHECKING, Optional
 import discord
 from discord import app_commands
@@ -14,8 +16,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ORDER_LOG_CHANNEL_NAME = "orders-log"
-
+ORDER_CATEGORY_NAME = "Orders"
 SERVICES = {
     "standard": {
         "label": "Standard Ride",
@@ -35,39 +36,82 @@ SERVICES = {
 }
 
 
-async def ensure_orders_log_channel(guild: discord.Guild) -> Optional[discord.TextChannel]:
-    """Get or create a staff-only orders log channel (not a public ticket channel)."""
-    for channel in guild.text_channels:
-        if channel.name == ORDER_LOG_CHANNEL_NAME:
-            return channel
+def _short_id(length: int = 4) -> str:
+    alphabet = string.ascii_lowercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
+
+async def ensure_orders_category(guild: discord.Guild) -> Optional[discord.CategoryChannel]:
+    """Get or create the Orders category (server channels)."""
+    for category in guild.categories:
+        if category.name == ORDER_CATEGORY_NAME:
+            return category
     if not guild.me.guild_permissions.manage_channels:
-        logger.warning("Missing manage_channels in %s; cannot create orders log channel.", guild.id)
+        logger.warning("Missing manage_channels in %s; cannot create Orders category.", guild.id)
         return None
+    try:
+        category = await guild.create_category(ORDER_CATEGORY_NAME, reason="Create Orders category")
+        logger.info("Created Orders category in guild %s", guild.id)
+        return category
+    except Exception as exc:
+        logger.error("Failed to create Orders category in guild %s: %s", guild.id, exc, exc_info=True)
+        return None
+
+
+async def create_order_channel(
+    guild: discord.Guild,
+    user: discord.User,
+    service: dict,
+) -> Optional[discord.TextChannel]:
+    """Create a server ticket channel for an order."""
+    category = await ensure_orders_category(guild)
+    if category is None:
+        return None
+
+    base_username = user.name.lower().replace(" ", "-")[:16]
+    service_slug = service["label"].lower().replace(" ", "-")
+    channel_name = f"order-{base_username}-{service_slug}-{_short_id()}"
 
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+        guild.me: discord.PermissionOverwrite(
+            view_channel=True, send_messages=True, read_message_history=True, manage_messages=True
+        ),
+        user: discord.PermissionOverwrite(
+            view_channel=True, send_messages=True, read_message_history=True, attach_files=True
+        ),
     }
 
-    # Allow all service-specific roles if they exist
-    for svc in SERVICES.values():
-        role = guild.get_role(svc["role_id"])
-        if role:
-            overwrites[role] = discord.PermissionOverwrite(
-                view_channel=True, send_messages=True, read_message_history=True
+    role = guild.get_role(service["role_id"])
+    if role:
+        overwrites[role] = discord.PermissionOverwrite(
+            view_channel=True, send_messages=True, read_message_history=True
+        )
+
+    # Allow admins to see if they have administrator
+    for r in guild.roles:
+        if r.permissions.administrator:
+            overwrites.setdefault(
+                r,
+                discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True, read_message_history=True, manage_messages=True
+                ),
             )
 
     try:
         channel = await guild.create_text_channel(
-            ORDER_LOG_CHANNEL_NAME,
+            channel_name,
+            category=category,
             overwrites=overwrites,
-            reason="Create orders staff log channel",
+            reason=f"Order ticket for {user} ({service['label']})",
         )
-        logger.info("Created orders log channel in guild %s", guild.id)
+        logger.info("Created order channel %s for user %s (%s)", channel.id, user.id, service["label"])
         return channel
+    except discord.Forbidden:
+        logger.warning("Missing permissions to create order channel in guild %s", guild.id)
+        return None
     except Exception as exc:
-        logger.error("Failed to create orders log channel in guild %s: %s", guild.id, exc, exc_info=True)
+        logger.error("Failed to create order channel in guild %s: %s", guild.id, exc, exc_info=True)
         return None
 
 
@@ -79,7 +123,7 @@ class OrderModal(discord.ui.Modal):
 
 
 class OrderSelect(discord.ui.Select):
-    """Select menu for choosing a service; triggers DM intake (no modal)."""
+    """Select menu for choosing a service; triggers DM intake and server ticket creation."""
 
     def __init__(self, bot: "Bot") -> None:
         self.bot = bot
@@ -164,8 +208,8 @@ class OrderSelect(discord.ui.Select):
         await dm.send(embed=confirm)
         logger.info("DM order ticket opened for user %s (%s)", user.id, service['label'])
 
-        # Staff notification (role mention above embed)
-        await self.notify_staff(guild, user, service, roblox_username, location)
+        # Create server ticket channel and notify staff
+        await self.create_server_ticket(guild, user, service, roblox_username, location)
 
     async def prompt(self, dm: discord.DMChannel, user: discord.User, question: str, timeout: float = 180.0) -> Optional[str]:
         """Prompt user in DM and wait for a response."""
@@ -183,7 +227,7 @@ class OrderSelect(discord.ui.Select):
             logger.error("Error collecting input from user %s: %s", user.id, exc, exc_info=True)
             return None
 
-    async def notify_staff(
+    async def create_server_ticket(
         self,
         guild: discord.Guild,
         user: discord.User,
@@ -191,18 +235,22 @@ class OrderSelect(discord.ui.Select):
         roblox_username: str,
         location: str,
     ) -> None:
-        """Notify appropriate staff role in a log channel."""
-        log_channel = await ensure_orders_log_channel(guild)
-        if log_channel is None:
+        """Create server channel under Orders and notify appropriate staff role."""
+        channel = await create_order_channel(guild, user, service)
+        if channel is None:
+            try:
+                await user.send(embed=brand_embed(title="Ticket Creation Failed", description="I could not create your order ticket."))
+            except Exception:
+                pass
             return
 
         role = guild.get_role(service.get("role_id"))
-        content = role.mention if role else "Order notification"
+        content = role.mention if role else "Order ticket created"
         if role is None:
             logger.warning("Service role missing for %s in guild %s", service.get("label"), guild.id)
 
         embed = brand_embed(
-            title="New Order Ticket",
+            title="Order Ticket",
             description=(
                 f"**Service:** {service['label']}\n"
                 f"**User:** {user.mention} (`{user.id}`)\n"
@@ -212,21 +260,23 @@ class OrderSelect(discord.ui.Select):
             color=BRAND_ACCENT,
         )
         embed.set_author(name=str(user), icon_url=user.display_avatar.url)
+        embed.timestamp = discord.utils.utcnow()
 
         try:
-            await log_channel.send(
+            await channel.send(
                 content=content,
                 embed=embed,
                 allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False, replied_user=False),
             )
             logger.info(
-                "Order staff notified for service %s in guild %s (role mentioned: %s)",
+                "Order channel %s created for %s (%s) with role mention: %s",
+                channel.id,
+                user.id,
                 service.get("label"),
-                guild.id,
                 bool(role),
             )
         except Exception as exc:
-            logger.error("Failed to notify staff for order in guild %s: %s", guild.id, exc, exc_info=True)
+            logger.error("Failed to send order ticket message in guild %s: %s", guild.id, exc, exc_info=True)
 
 
 class OrderView(discord.ui.View):
