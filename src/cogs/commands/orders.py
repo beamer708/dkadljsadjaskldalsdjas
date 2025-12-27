@@ -1,9 +1,7 @@
-"""Independent order ticket system (separate from support tickets)."""
+"""Independent order ticket system using DM-only tickets (separate from support)."""
 
 import asyncio
 import logging
-import secrets
-import string
 from typing import TYPE_CHECKING, Optional
 import discord
 from discord import app_commands
@@ -16,166 +14,72 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ORDER_CATEGORY_NAME = "Orders"
-ORDER_STAFF_ROLE_ID: Optional[int] = None  # Set to a role ID if you have a dedicated orders team
+ORDER_LOG_CHANNEL_NAME = "orders-log"
 
 SERVICES = {
     "standard": {
         "label": "Standard Ride",
         "description": "Pickup and drop-off (limo & blackout tiers).",
+        "role_id": 1405553962010148925,  # Driver role
     },
     "getaway": {
         "label": "Getaway Driver",
         "description": "Emergency pickup when evading police.",
+        "role_id": 1453927013688807677,  # Getaway Driver role
     },
     "transit": {
         "label": "Transit Services",
         "description": "Public transportation (bus services).",
+        "role_id": 1409702187851972778,  # Transit role
     },
 }
 
 
-def _short_id(length: int = 4) -> str:
-    alphabet = string.ascii_lowercase + string.digits
-    return "".join(secrets.choice(alphabet) for _ in range(length))
+async def ensure_orders_log_channel(guild: discord.Guild) -> Optional[discord.TextChannel]:
+    """Get or create a staff-only orders log channel (not a public ticket channel)."""
+    for channel in guild.text_channels:
+        if channel.name == ORDER_LOG_CHANNEL_NAME:
+            return channel
 
-
-async def ensure_orders_category(guild: discord.Guild) -> Optional[discord.CategoryChannel]:
-    """Get or create the Orders category."""
-    for category in guild.categories:
-        if category.name == ORDER_CATEGORY_NAME:
-            return category
     if not guild.me.guild_permissions.manage_channels:
-        logger.warning("Missing manage_channels in %s; cannot create Orders category.", guild.id)
+        logger.warning("Missing manage_channels in %s; cannot create orders log channel.", guild.id)
         return None
-    try:
-        category = await guild.create_category(ORDER_CATEGORY_NAME, reason="Create Orders category")
-        logger.info("Created Orders category in guild %s", guild.id)
-        return category
-    except Exception as exc:
-        logger.error("Failed to create Orders category in guild %s: %s", guild.id, exc, exc_info=True)
-        return None
-
-
-async def create_order_channel(
-    guild: discord.Guild,
-    user: discord.User,
-    service_label: str,
-) -> Optional[discord.TextChannel]:
-    """Create a ticket channel for an order."""
-    category = await ensure_orders_category(guild)
-    if category is None:
-        return None
-
-    base_username = user.name.lower().replace(" ", "-")[:16]
-    channel_name = f"order-{base_username}-{service_label.lower().replace(' ', '-')}-{_short_id()}"
 
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
         guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
     }
 
-    # Allow the user
-    overwrites[user] = discord.PermissionOverwrite(
-        view_channel=True, send_messages=True, read_message_history=True, attach_files=True
-    )
-
-    # Optional staff role
-    if ORDER_STAFF_ROLE_ID:
-        staff_role = guild.get_role(ORDER_STAFF_ROLE_ID)
-        if staff_role:
-            overwrites[staff_role] = discord.PermissionOverwrite(
+    # Allow all service-specific roles if they exist
+    for svc in SERVICES.values():
+        role = guild.get_role(svc["role_id"])
+        if role:
+            overwrites[role] = discord.PermissionOverwrite(
                 view_channel=True, send_messages=True, read_message_history=True
             )
 
     try:
         channel = await guild.create_text_channel(
-            channel_name,
-            category=category,
+            ORDER_LOG_CHANNEL_NAME,
             overwrites=overwrites,
-            reason=f"Order ticket for {user} ({service_label})",
+            reason="Create orders staff log channel",
         )
-        logger.info("Created order channel %s for user %s (%s)", channel.id, user.id, service_label)
+        logger.info("Created orders log channel in guild %s", guild.id)
         return channel
-    except discord.Forbidden:
-        logger.warning("Missing permissions to create order channel in guild %s", guild.id)
-        return None
     except Exception as exc:
-        logger.error("Failed to create order channel in guild %s: %s", guild.id, exc, exc_info=True)
+        logger.error("Failed to create orders log channel in guild %s: %s", guild.id, exc, exc_info=True)
         return None
 
 
 class OrderModal(discord.ui.Modal):
-    """Modal to collect order details."""
+    """Modal kept for compatibility; not used in DM-based intake flow."""
 
-    def __init__(self, bot: "Bot", service_key: str):
-        self.bot = bot
-        self.service_key = service_key
-        service_label = SERVICES[service_key]["label"]
-        super().__init__(title=f"{service_label} Order Form", timeout=300)
-
-        self.roblox_username = discord.ui.TextInput(
-            label="Roblox Username", placeholder="Enter your Roblox username", required=True, max_length=100
-        )
-        self.location = discord.ui.TextInput(
-            label="Location",
-            style=discord.TextStyle.paragraph,
-            placeholder="Where should we meet you?",
-            required=True,
-            max_length=500,
-        )
-
-        self.add_item(self.roblox_username)
-        self.add_item(self.location)
-
-    async def on_submit(self, interaction: discord.Interaction) -> None:
-        service_label = SERVICES[self.service_key]["label"]
-        guild = interaction.guild
-
-        if guild is None:
-            await interaction.response.send_message(
-                embed=brand_embed(title="Unable to create ticket", description="No guild context available."),
-                ephemeral=True,
-            )
-            return
-
-        channel = await create_order_channel(guild, interaction.user, service_label)
-        if channel is None:
-            await interaction.response.send_message(
-                embed=brand_embed(title="Ticket creation failed", description="I could not create your order ticket."),
-                ephemeral=True,
-            )
-            return
-
-        summary = brand_embed(
-            title="Order Ticket Created",
-            description=(
-                f"**Service:** {service_label}\n"
-                f"**Roblox Username:** {self.roblox_username.value}\n"
-                f"**Location:** {self.location.value}"
-            ),
-            color=BRAND_ACCENT,
-        )
-        summary.set_author(name=str(interaction.user), icon_url=interaction.user.display_avatar.url)
-
-        await channel.send(content=interaction.user.mention, embed=summary)
-        await interaction.response.send_message(
-            embed=brand_embed(
-                title="Order ticket created",
-                description=f"Channel: {channel.mention}\nA team member will assist you shortly.",
-            ),
-            ephemeral=True,
-        )
-        logger.info(
-            "Order modal submitted by %s; ticket channel %s created for %s",
-            interaction.user.id,
-            channel.id,
-            service_label,
-        )
+    def __init__(self, *args, **kwargs):
+        super().__init__(title="Unused", timeout=1)
 
 
 class OrderSelect(discord.ui.Select):
-    """Select menu for choosing a service."""
+    """Select menu for choosing a service; triggers DM intake (no modal)."""
 
     def __init__(self, bot: "Bot") -> None:
         self.bot = bot
@@ -193,9 +97,136 @@ class OrderSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:  # type: ignore[override]
         service_key = self.values[0]
-        modal = OrderModal(self.bot, service_key)
-        await interaction.response.send_modal(modal)
-        logger.info("Order modal opened for user %s (%s)", interaction.user.id, service_key)
+        await interaction.response.send_message(
+            embed=brand_embed(
+                title="Check Your DMs",
+                description="I sent you a DM to collect your order details.",
+            ),
+            ephemeral=True,
+        )
+        await self.start_dm_intake(interaction, service_key)
+        logger.info("Order selection by user %s (%s)", interaction.user.id, service_key)
+
+    async def start_dm_intake(self, interaction: discord.Interaction, service_key: str) -> None:
+        """Collect details in DMs and notify staff."""
+        service = SERVICES.get(service_key)
+        if service is None:
+            return
+
+        # Resolve guild context for staff notifications
+        guild = interaction.guild
+        if guild is None and getattr(self.bot.config, "dev_guild_id", None):
+            guild = self.bot.get_guild(self.bot.config.dev_guild_id)
+        if guild is None:
+            return
+
+        user = interaction.user
+        try:
+            dm = user.dm_channel or await user.create_dm()
+        except discord.Forbidden:
+            logger.warning("Cannot DM user %s for order intake (DMs closed)", user.id)
+            return
+        except Exception as exc:
+            logger.error("Failed to open DM with user %s: %s", user.id, exc, exc_info=True)
+            return
+
+        intro = brand_embed(
+            title=f"{service['label']} Order",
+            description="Please provide the following details to create your order ticket.",
+            color=BRAND_ACCENT,
+        )
+        intro.add_field(name="Step 1", value="Reply with your Roblox Username.", inline=False)
+        intro.add_field(name="Step 2", value="Then reply with your Location.", inline=False)
+        await dm.send(embed=intro)
+
+        roblox_username = await self.prompt(dm, user, "Roblox Username:", timeout=180)
+        if roblox_username is None:
+            await dm.send(embed=brand_embed(title="Timed Out", description="No response received. Please try again."))
+            return
+
+        location = await self.prompt(dm, user, "Location:", timeout=180)
+        if location is None:
+            await dm.send(embed=brand_embed(title="Timed Out", description="No response received. Please try again."))
+            return
+
+        # Confirm to user
+        confirm = brand_embed(
+            title="Order Ticket Created",
+            description=(
+                f"**Service:** {service['label']}\n"
+                f"**Roblox Username:** {roblox_username}\n"
+                f"**Location:** {location}\n\n"
+                "A team member will assist you shortly."
+            ),
+            color=BRAND_ACCENT,
+        )
+        confirm.set_author(name=str(user), icon_url=user.display_avatar.url)
+        await dm.send(embed=confirm)
+        logger.info("DM order ticket opened for user %s (%s)", user.id, service['label'])
+
+        # Staff notification (role mention above embed)
+        await self.notify_staff(guild, user, service, roblox_username, location)
+
+    async def prompt(self, dm: discord.DMChannel, user: discord.User, question: str, timeout: float = 180.0) -> Optional[str]:
+        """Prompt user in DM and wait for a response."""
+        await dm.send(question)
+
+        def check(msg: discord.Message) -> bool:
+            return msg.author.id == user.id and isinstance(msg.channel, discord.DMChannel)
+
+        try:
+            msg = await self.bot.wait_for("message", check=check, timeout=timeout)
+            return msg.content.strip()
+        except asyncio.TimeoutError:
+            return None
+        except Exception as exc:
+            logger.error("Error collecting input from user %s: %s", user.id, exc, exc_info=True)
+            return None
+
+    async def notify_staff(
+        self,
+        guild: discord.Guild,
+        user: discord.User,
+        service: dict,
+        roblox_username: str,
+        location: str,
+    ) -> None:
+        """Notify appropriate staff role in a log channel."""
+        log_channel = await ensure_orders_log_channel(guild)
+        if log_channel is None:
+            return
+
+        role = guild.get_role(service.get("role_id"))
+        content = role.mention if role else "Order notification"
+        if role is None:
+            logger.warning("Service role missing for %s in guild %s", service.get("label"), guild.id)
+
+        embed = brand_embed(
+            title="New Order Ticket",
+            description=(
+                f"**Service:** {service['label']}\n"
+                f"**User:** {user.mention} (`{user.id}`)\n"
+                f"**Roblox Username:** {roblox_username}\n"
+                f"**Location:** {location}"
+            ),
+            color=BRAND_ACCENT,
+        )
+        embed.set_author(name=str(user), icon_url=user.display_avatar.url)
+
+        try:
+            await log_channel.send(
+                content=content,
+                embed=embed,
+                allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False, replied_user=False),
+            )
+            logger.info(
+                "Order staff notified for service %s in guild %s (role mentioned: %s)",
+                service.get("label"),
+                guild.id,
+                bool(role),
+            )
+        except Exception as exc:
+            logger.error("Failed to notify staff for order in guild %s: %s", guild.id, exc, exc_info=True)
 
 
 class OrderView(discord.ui.View):
