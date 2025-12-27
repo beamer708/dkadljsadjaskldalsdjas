@@ -258,8 +258,15 @@ class Orders(commands.Cog):
         embed.add_field(name="Getaway Driver", value="Emergency pickup when evading police.", inline=False)
         embed.add_field(name="Transit Services", value="Public transportation (bus services).", inline=False)
 
-        # Send directly to channel (not ephemeral, no followup)
-        await interaction.response.send_message(embed=embed, view=view)
+        # Send directly to the channel (regular message)
+        await interaction.channel.send(embed=embed, view=view)
+
+        # Ephemeral confirmation to the command user
+        if interaction.response.is_done():
+            await interaction.followup.send("Complete", ephemeral=True)
+        else:
+            await interaction.response.send_message("Complete", ephemeral=True)
+
         logger.info("Order menu posted in channel %s by %s", interaction.channel_id, interaction.user.id)
 
 
