@@ -1,7 +1,9 @@
-"""Order menu cog providing dropdown-triggered, DM-based ticket creation."""
+"""Independent order ticket system (separate from support tickets)."""
 
 import asyncio
 import logging
+import secrets
+import string
 from typing import TYPE_CHECKING, Optional
 import discord
 from discord import app_commands
@@ -11,47 +13,174 @@ from src.utils.embeds import brand_embed, BRAND_ACCENT
 
 if TYPE_CHECKING:
     from src.bot import Bot
-    from src.cogs.core.support import Support
 
 logger = logging.getLogger(__name__)
+
+ORDER_CATEGORY_NAME = "Orders"
+ORDER_STAFF_ROLE_ID: Optional[int] = None  # Set to a role ID if you have a dedicated orders team
 
 SERVICES = {
     "standard": {
         "label": "Standard Ride",
-        "description": "Pickup to your location — limo & blackout tiers",
-        "long": (
-            "A driver will pick you up and take you to your location.\n"
-            "Includes limo and blackout tiers."
-        ),
+        "description": "Pickup and drop-off (limo & blackout tiers).",
     },
     "getaway": {
         "label": "Getaway Driver",
-        "description": "Emergency pickup when evading police",
-        "long": (
-            "Emergency pickup when evading police.\n"
-            "Driver meets you at a specified location."
-        ),
+        "description": "Emergency pickup when evading police.",
     },
     "transit": {
         "label": "Transit Services",
-        "description": "Public transportation such as buses",
-        "long": (
-            "Public transportation options such as buses."
-        ),
+        "description": "Public transportation (bus services).",
     },
 }
 
 
+def _short_id(length: int = 4) -> str:
+    alphabet = string.ascii_lowercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+async def ensure_orders_category(guild: discord.Guild) -> Optional[discord.CategoryChannel]:
+    """Get or create the Orders category."""
+    for category in guild.categories:
+        if category.name == ORDER_CATEGORY_NAME:
+            return category
+    if not guild.me.guild_permissions.manage_channels:
+        logger.warning("Missing manage_channels in %s; cannot create Orders category.", guild.id)
+        return None
+    try:
+        category = await guild.create_category(ORDER_CATEGORY_NAME, reason="Create Orders category")
+        logger.info("Created Orders category in guild %s", guild.id)
+        return category
+    except Exception as exc:
+        logger.error("Failed to create Orders category in guild %s: %s", guild.id, exc, exc_info=True)
+        return None
+
+
+async def create_order_channel(
+    guild: discord.Guild,
+    user: discord.User,
+    service_label: str,
+) -> Optional[discord.TextChannel]:
+    """Create a ticket channel for an order."""
+    category = await ensure_orders_category(guild)
+    if category is None:
+        return None
+
+    base_username = user.name.lower().replace(" ", "-")[:16]
+    channel_name = f"order-{base_username}-{service_label.lower().replace(' ', '-')}-{_short_id()}"
+
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+    }
+
+    # Allow the user
+    overwrites[user] = discord.PermissionOverwrite(
+        view_channel=True, send_messages=True, read_message_history=True, attach_files=True
+    )
+
+    # Optional staff role
+    if ORDER_STAFF_ROLE_ID:
+        staff_role = guild.get_role(ORDER_STAFF_ROLE_ID)
+        if staff_role:
+            overwrites[staff_role] = discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, read_message_history=True
+            )
+
+    try:
+        channel = await guild.create_text_channel(
+            channel_name,
+            category=category,
+            overwrites=overwrites,
+            reason=f"Order ticket for {user} ({service_label})",
+        )
+        logger.info("Created order channel %s for user %s (%s)", channel.id, user.id, service_label)
+        return channel
+    except discord.Forbidden:
+        logger.warning("Missing permissions to create order channel in guild %s", guild.id)
+        return None
+    except Exception as exc:
+        logger.error("Failed to create order channel in guild %s: %s", guild.id, exc, exc_info=True)
+        return None
+
+
+class OrderModal(discord.ui.Modal):
+    """Modal to collect order details."""
+
+    def __init__(self, bot: "Bot", service_key: str):
+        self.bot = bot
+        self.service_key = service_key
+        service_label = SERVICES[service_key]["label"]
+        super().__init__(title=f"{service_label} Order Form", timeout=300)
+
+        self.roblox_username = discord.ui.TextInput(
+            label="Roblox Username", placeholder="Enter your Roblox username", required=True, max_length=100
+        )
+        self.location = discord.ui.TextInput(
+            label="Location",
+            style=discord.TextStyle.paragraph,
+            placeholder="Where should we meet you?",
+            required=True,
+            max_length=500,
+        )
+
+        self.add_item(self.roblox_username)
+        self.add_item(self.location)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        service_label = SERVICES[self.service_key]["label"]
+        guild = interaction.guild
+
+        if guild is None:
+            await interaction.response.send_message(
+                embed=brand_embed(title="Unable to create ticket", description="No guild context available."),
+                ephemeral=True,
+            )
+            return
+
+        channel = await create_order_channel(guild, interaction.user, service_label)
+        if channel is None:
+            await interaction.response.send_message(
+                embed=brand_embed(title="Ticket creation failed", description="I could not create your order ticket."),
+                ephemeral=True,
+            )
+            return
+
+        summary = brand_embed(
+            title="Order Ticket Created",
+            description=(
+                f"**Service:** {service_label}\n"
+                f"**Roblox Username:** {self.roblox_username.value}\n"
+                f"**Location:** {self.location.value}"
+            ),
+            color=BRAND_ACCENT,
+        )
+        summary.set_author(name=str(interaction.user), icon_url=interaction.user.display_avatar.url)
+
+        await channel.send(content=interaction.user.mention, embed=summary)
+        await interaction.response.send_message(
+            embed=brand_embed(
+                title="Order ticket created",
+                description=f"Channel: {channel.mention}\nA team member will assist you shortly.",
+            ),
+            ephemeral=True,
+        )
+        logger.info(
+            "Order modal submitted by %s; ticket channel %s created for %s",
+            interaction.user.id,
+            channel.id,
+            service_label,
+        )
+
+
 class OrderSelect(discord.ui.Select):
     """Select menu for choosing a service."""
-    
-    def __init__(self) -> None:
+
+    def __init__(self, bot: "Bot") -> None:
+        self.bot = bot
         options = [
-            discord.SelectOption(
-                label=data["label"],
-                description=data["description"][:100],
-                value=key,
-            )
+            discord.SelectOption(label=data["label"], description=data["description"][:100], value=key)
             for key, data in SERVICES.items()
         ]
         super().__init__(
@@ -61,162 +190,36 @@ class OrderSelect(discord.ui.Select):
             options=options,
             custom_id="order_service_select",
         )
-    
+
     async def callback(self, interaction: discord.Interaction) -> None:  # type: ignore[override]
-        view: OrderView = self.view  # type: ignore[assignment]
-        await view.handle_selection(interaction, self.values[0])
+        service_key = self.values[0]
+        modal = OrderModal(self.bot, service_key)
+        await interaction.response.send_modal(modal)
+        logger.info("Order modal opened for user %s (%s)", interaction.user.id, service_key)
 
 
 class OrderView(discord.ui.View):
     """View that contains the order select menu."""
-    
+
     def __init__(self, bot: "Bot") -> None:
         super().__init__(timeout=None)
-        self.bot = bot
-        self.add_item(OrderSelect())
-    
-    async def handle_selection(self, interaction: discord.Interaction, service_key: str) -> None:
-        support_cog: Optional["Support"] = self.bot.get_cog("Support")  # type: ignore[type-arg]
-        if support_cog is None:
-            await interaction.response.send_message(
-                embed=brand_embed(
-                    title="Support Unavailable",
-                    description="The support system is not loaded. Please try again later.",
-                ),
-                ephemeral=True,
-            )
-            return
-        
-        service = SERVICES.get(service_key)
-        if service is None:
-            await interaction.response.send_message(
-                embed=brand_embed(title="Invalid Selection", description="That service is not available."),
-                ephemeral=True,
-            )
-            return
-        
-        if interaction.user.id in support_cog.tickets:
-            existing_channel_id = support_cog.tickets[interaction.user.id]
-            note = (
-                f"You already have an open ticket (`{existing_channel_id}`). "
-                "Please continue there to avoid duplicates."
-            )
-            await interaction.response.send_message(
-                embed=brand_embed(title="Ticket Already Open", description=note),
-                ephemeral=True,
-            )
-            return
-        
-        await interaction.response.send_message(
-            embed=brand_embed(
-                title="Check Your DMs",
-                description="I sent you a DM to collect your order details.",
-            ),
-            ephemeral=True,
-        )
-        
-        guild = interaction.guild
-        if guild is None and self.bot.config.dev_guild_id:
-            guild = self.bot.get_guild(self.bot.config.dev_guild_id)
-        
-        if guild is None:
-            await interaction.followup.send(
-                embed=brand_embed(
-                    title="Unable to Create Ticket",
-                    description="No guild context available to create your order ticket.",
-                ),
-                ephemeral=True,
-            )
-            return
-        
-        await self._collect_and_create(interaction.user, guild, service, support_cog)
-    
-    async def _collect_and_create(
-        self,
-        user: discord.User,
-        guild: discord.Guild,
-        service: dict[str, str],
-        support_cog: "Support",
-    ) -> None:
-        """Collect order details via DM and create the ticket."""
-        try:
-            dm = user.dm_channel or await user.create_dm()
-        except discord.Forbidden:
-            logger.warning("Cannot DM user %s for order intake (DMs closed)", user.id)
-            return
-        except Exception as exc:
-            logger.error("Failed to open DM with user %s: %s", user.id, exc, exc_info=True)
-            return
-        
-        intro_embed = brand_embed(
-            title=f"{service['label']} Intake",
-            description=(
-                f"{service['long']}\n\n"
-                "Please answer the following to start your ticket:"
-            ),
-        )
-        await dm.send(embed=intro_embed)
-        
-        roblox_username = await self._prompt(dm, user, "Roblox Username:")
-        if roblox_username is None:
-            await dm.send(embed=brand_embed(title="Timed Out", description="No response received. Please try again."))
-            return
-        
-        location = await self._prompt(dm, user, "Your Location:")
-        if location is None:
-            await dm.send(embed=brand_embed(title="Timed Out", description="No response received. Please try again."))
-            return
-        
-        details = {"roblox_username": roblox_username, "location": location}
-        channel = await support_cog.create_ticket_from_order(
-            user=user,
-            guild=guild,
-            service_name=service["label"],
-            details=details,
-        )
-        if channel is None:
-            await dm.send(embed=brand_embed(title="Ticket Creation Failed", description="We could not create your ticket. Please try again later."))
-            return
-        
-        await dm.send(
-            embed=brand_embed(
-                title="Ticket Created",
-                description=f"Your order ticket has been created: `{channel.name}`\nOur team will contact you shortly.",
-            )
-        )
-    
-    async def _prompt(self, dm: discord.DMChannel, user: discord.User, question: str, timeout: float = 120.0) -> Optional[str]:
-        """Prompt the user for input and return the response content."""
-        await dm.send(question)
-        
-        def check(msg: discord.Message) -> bool:
-            return msg.author.id == user.id and isinstance(msg.channel, discord.DMChannel)
-        
-        try:
-            msg = await self.bot.wait_for("message", check=check, timeout=timeout)
-            return msg.content.strip()
-        except asyncio.TimeoutError:
-            return None
-        except Exception as exc:
-            logger.error("Error while collecting input from user %s: %s", user.id, exc, exc_info=True)
-            return None
+        self.add_item(OrderSelect(bot))
 
 
 class Orders(commands.Cog):
-    """Cog for posting the order menu."""
-    
+    """Cog for posting the order menu (independent order system)."""
+
     def __init__(self, bot: "Bot") -> None:
         self.bot = bot
-    
+
     async def cog_load(self) -> None:
-        """Log cog load and ensure command is registered in the correct scope."""
+        """Log cog load and ensure command is registered."""
         guild = (
             discord.Object(id=self.bot.config.dev_guild_id)
             if getattr(self.bot.config, "dev_guild_id", None)
             else None
         )
         try:
-            # Ensure command exists in tree for the target scope
             existing = self.bot.tree.get_command("order-menu", type=discord.AppCommandType.chat_input, guild=guild)
             if existing:
                 self.bot.tree.remove_command("order-menu", type=discord.AppCommandType.chat_input, guild=guild)
@@ -226,13 +229,12 @@ class Orders(commands.Cog):
             logger.info("Registered /order-menu slash command in %s", scope)
         except Exception as exc:
             logger.error("Failed to register /order-menu: %s", exc, exc_info=True)
-    
+
     @app_commands.command(name="order-menu", description="Post the order dropdown menu (Admin only)")
     @app_commands.default_permissions(administrator=True)
     @app_commands.checks.has_permissions(administrator=True)
     async def order_menu(self, interaction: discord.Interaction) -> None:
         """Post the order embed with dropdown in the current channel."""
-        # Runtime fail-safe permission check
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
                 embed=brand_embed(
@@ -242,20 +244,21 @@ class Orders(commands.Cog):
                 ephemeral=True,
             )
             return
-        
+
         view = OrderView(self.bot)
         embed = brand_embed(
             title="U-Drive Orders",
             description=(
-                "Select a service below to start a private order ticket via DM.\n"
-                "A team member will follow up once your ticket is created."
+                "Choose a service from the menu below to open an order ticket.\n"
+                "A modal form will collect your Roblox username and location."
             ),
             color=BRAND_ACCENT,
         )
-        embed.add_field(name="Standard Ride", value="Pickup to your location (limo & blackout tiers).", inline=False)
-        embed.add_field(name="Getaway Driver", value="Emergency pickup while evading police.", inline=False)
-        embed.add_field(name="Transit Services", value="Public transportation such as buses.", inline=False)
-        
+        embed.add_field(name="Standard Ride", value="Pickup and drop-off (limo & blackout tiers).", inline=False)
+        embed.add_field(name="Getaway Driver", value="Emergency pickup when evading police.", inline=False)
+        embed.add_field(name="Transit Services", value="Public transportation (bus services).", inline=False)
+
+        # Send directly to channel (not ephemeral, no followup)
         await interaction.response.send_message(embed=embed, view=view)
         logger.info("Order menu posted in channel %s by %s", interaction.channel_id, interaction.user.id)
 
