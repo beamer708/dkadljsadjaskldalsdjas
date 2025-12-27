@@ -208,10 +208,41 @@ class Orders(commands.Cog):
     def __init__(self, bot: "Bot") -> None:
         self.bot = bot
     
+    async def cog_load(self) -> None:
+        """Log cog load and ensure command is registered in the correct scope."""
+        guild = (
+            discord.Object(id=self.bot.config.dev_guild_id)
+            if getattr(self.bot.config, "dev_guild_id", None)
+            else None
+        )
+        try:
+            # Ensure command exists in tree for the target scope
+            existing = self.bot.tree.get_command("order-menu", type=discord.AppCommandType.chat_input, guild=guild)
+            if existing:
+                self.bot.tree.remove_command("order-menu", type=discord.AppCommandType.chat_input, guild=guild)
+                logger.info("Removed existing /order-menu before re-registering")
+            self.bot.tree.add_command(self.order_menu, guild=guild)
+            scope = f"guild {guild.id}" if guild else "global scope"
+            logger.info("Registered /order-menu slash command in %s", scope)
+        except Exception as exc:
+            logger.error("Failed to register /order-menu: %s", exc, exc_info=True)
+    
     @app_commands.command(name="order-menu", description="Post the order dropdown menu (Admin only)")
+    @app_commands.default_permissions(administrator=True)
     @app_commands.checks.has_permissions(administrator=True)
     async def order_menu(self, interaction: discord.Interaction) -> None:
         """Post the order embed with dropdown in the current channel."""
+        # Runtime fail-safe permission check
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                embed=brand_embed(
+                    title="Permission Denied",
+                    description="You need administrator permissions to use this command.",
+                ),
+                ephemeral=True,
+            )
+            return
+        
         view = OrderView(self.bot)
         embed = brand_embed(
             title="U-Drive Orders",
