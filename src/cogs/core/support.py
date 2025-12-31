@@ -11,6 +11,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from src.utils.embeds import brand_embed, BRAND_PRIMARY
+from src.utils.ui import build_support_ticket_opened_embed, build_order_details_embed
 
 if TYPE_CHECKING:
     from src.bot import Bot
@@ -462,17 +463,7 @@ class Support(commands.Cog):
             else:
                 logger.warning("Staff role %s not found in guild %s", SUPPORT_STAFF_ROLE_ID, channel.guild.id if channel.guild else "unknown")
 
-            embed = self.create_brand_embed(
-                title="Support Ticket Opened",
-                description=f"New support ticket from {user.mention} (`{user.name}`)"
-            )
-            embed.add_field(name="User ID", value=f"`{user.id}`", inline=True)
-            if service_name:
-                embed.add_field(name="Service", value=service_name, inline=True)
-            embed.add_field(name="Account Created", value=f"<t:{int(user.created_at.timestamp())}:R>", inline=True)
-            embed.set_footer(text=f"Reply in this channel to send messages to the user")
-            embed.timestamp = discord.utils.utcnow()
-
+            embed = build_support_ticket_opened_embed(user, service_name)
             view = CloseTicketView(self)
             await channel.send(embed=embed, view=view)
             logger.info("Attached CloseTicketView to support channel %s", channel.id)
@@ -662,18 +653,7 @@ class Support(commands.Cog):
         
         # Send details to staff channel
         if details:
-            detail_lines = []
-            if roblox_username := details.get("roblox_username"):
-                detail_lines.append(f"**Roblox Username:** {roblox_username}")
-            if location := details.get("location"):
-                detail_lines.append(f"**Location:** {location}")
-            detail_body = "\n".join(detail_lines) if detail_lines else "No additional details provided."
-            
-            detail_embed = self.create_brand_embed(
-                title=f"Order Details - {service_name}",
-                description=detail_body
-            )
-            detail_embed.set_author(name=str(user), icon_url=user.display_avatar.url)
+            detail_embed = build_order_details_embed(service_name, user, details)
             await channel.send(embed=detail_embed)
         
         await self.send_user_confirmation(user, channel, service_name=service_name)

@@ -8,6 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from src.utils.embeds import brand_embed, BRAND_ACCENT
+from src.utils.ui import build_order_menu_embed, build_order_details_embed
 
 if TYPE_CHECKING:
     from src.bot import Bot
@@ -221,7 +222,7 @@ class OrderSelect(discord.ui.Select):
             return
 
         summary = brand_embed(
-            title="Order Ticket",
+            title="Order Ticket Summary",
             description=(
                 f"**Service:** {service['label']}\n"
                 f"**User:** {user.mention} (`{user.id}`)\n"
@@ -325,17 +326,7 @@ class Orders(commands.Cog):
             return
 
         view = OrderView(self.bot)
-        embed = brand_embed(
-            title="U-Drive Orders",
-            description=(
-                "Choose a service from the menu below to open an order ticket.\n"
-                "A modal form will collect your Roblox username and location."
-            ),
-            color=BRAND_ACCENT,
-        )
-        embed.add_field(name="Standard Ride", value="Pickup and drop-off (limo & blackout tiers).", inline=False)
-        embed.add_field(name="Getaway Driver", value="Emergency pickup when evading police.", inline=False)
-        embed.add_field(name="Transit Services", value="Public transportation (bus services).", inline=False)
+        embed = build_order_menu_embed()
 
         # Send directly to the channel (regular message)
         await interaction.channel.send(embed=embed, view=view)
