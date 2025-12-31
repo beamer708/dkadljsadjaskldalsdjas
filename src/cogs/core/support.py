@@ -24,6 +24,78 @@ TICKET_PREFIX = "support"
 SHORT_ID_LENGTH = 6
 SUPPORT_STAFF_ROLE_ID = 1454227177615655034  # Role ID for staff who can close tickets
 TRANSCRIPTS_DIR = Path(__file__).parent.parent.parent.parent / "transcripts"
+SUPPORT_CLOSE_CUSTOM_ID = "support_close_ticket"
+
+
+class CloseTicketView(discord.ui.View):
+    """Persistent view that allows staff to close tickets via button."""
+
+    def __init__(self, support: "Support") -> None:
+        super().__init__(timeout=None)
+        self.support = support
+
+    @discord.ui.button(
+        label="Close Ticket",
+        style=discord.ButtonStyle.danger,
+        custom_id=SUPPORT_CLOSE_CUSTOM_ID,
+        emoji="🛑",
+    )
+    async def close_ticket_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        logger.info(
+            "Close-ticket button invoked in channel %s by user %s",
+            interaction.channel_id,
+            interaction.user.id if interaction.user else "unknown",
+        )
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception as exc:
+            logger.error("Failed to defer close-ticket interaction: %s", exc, exc_info=True)
+            return
+
+        if not interaction.guild or not isinstance(interaction.user, discord.Member):
+            embed = self.support.create_brand_embed(
+                title="Invalid Context",
+                description="Use this button inside a support ticket channel.",
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
+        staff_role = interaction.guild.get_role(SUPPORT_STAFF_ROLE_ID)
+        if not staff_role or staff_role not in interaction.user.roles:
+            embed = self.support.create_brand_embed(
+                title="Permission Denied",
+                description="You need the support staff role to close tickets.",
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
+        channel = interaction.channel
+        if not isinstance(channel, discord.TextChannel):
+            embed = self.support.create_brand_embed(
+                title="Error",
+                description="This channel is not a support ticket.",
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
+        try:
+            await self.support.close_ticket(interaction, channel, interaction.user)
+        except Exception as exc:
+            logger.error(
+                "Error handling close-ticket button in channel %s: %s",
+                channel.id,
+                exc,
+                exc_info=True,
+            )
+            await interaction.followup.send(
+                embed=self.support.create_brand_embed(
+                    title="Error",
+                    description="Could not close this ticket. Try again or use /close.",
+                ),
+                ephemeral=True,
+            )
 
 class Support(commands.Cog):
     """Handles DM-based support tickets for U-Drive customer support."""
@@ -58,6 +130,12 @@ class Support(commands.Cog):
             logger.info(f"Registered /close slash command in {scope}")
         except Exception as exc:
             logger.error(f"Failed to register /close command: {exc}", exc_info=True)
+
+        try:
+            self.bot.add_view(CloseTicketView(self))
+            logger.info("Registered persistent CloseTicketView (Components v2)")
+        except Exception as exc:
+            logger.error("Failed to register persistent CloseTicketView: %s", exc, exc_info=True)
 
         logger.info("Support cog loaded")
 
@@ -394,8 +472,10 @@ class Support(commands.Cog):
             embed.add_field(name="Account Created", value=f"<t:{int(user.created_at.timestamp())}:R>", inline=True)
             embed.set_footer(text=f"Reply in this channel to send messages to the user")
             embed.timestamp = discord.utils.utcnow()
-            
-            await channel.send(embed=embed)
+
+            view = CloseTicketView(self)
+            await channel.send(embed=embed, view=view)
+            logger.info("Attached CloseTicketView to support channel %s", channel.id)
         except Exception as e:
             logger.error(f"Failed to send ticket opened message: {e}", exc_info=True)
     
