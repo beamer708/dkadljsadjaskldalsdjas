@@ -133,23 +133,42 @@ class OrderSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:  # type: ignore[override]
         service_key = self.values[0]
+        logger.info("Order selection received from user %s (%s)", interaction.user.id, service_key)
+        try:
+            # Defer immediately to avoid interaction timeouts while we create channels.
+            await interaction.response.defer(ephemeral=True, thinking=False)
+        except Exception as exc:
+            logger.error("Failed to defer order selection for user %s: %s", interaction.user.id, exc, exc_info=True)
+            return
+
         await self.handle_selection(interaction, service_key)
-        logger.info("Order selection by user %s (%s)", interaction.user.id, service_key)
 
     async def handle_selection(self, interaction: discord.Interaction, service_key: str) -> None:
         service = SERVICES.get(service_key)
         if service is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=brand_embed(title="Invalid selection", description="That service is not available."),
                 ephemeral=True,
             )
+            return
+
+        orders_cog = self.bot.get_cog("Orders")
+        if orders_cog is None:
+            await interaction.followup.send(
+                embed=brand_embed(
+                    title="Order system unavailable",
+                    description="Please try again later. (Orders cog not loaded)",
+                ),
+                ephemeral=True,
+            )
+            logger.error("Orders cog missing when handling selection")
             return
 
         guild = interaction.guild
         if guild is None and getattr(self.bot.config, "dev_guild_id", None):
             guild = self.bot.get_guild(self.bot.config.dev_guild_id)
         if guild is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=brand_embed(title="Error", description="No guild context available."), ephemeral=True
             )
             return
@@ -157,9 +176,9 @@ class OrderSelect(discord.ui.Select):
         user = interaction.user
 
         # Prevent duplicate active orders per user
-        if user.id in self.bot.get_cog("Orders").active_orders:  # type: ignore[attr-defined]
-            existing_id = self.bot.get_cog("Orders").active_orders[user.id]  # type: ignore[attr-defined]
-            await interaction.response.send_message(
+        if user.id in orders_cog.active_orders:  # type: ignore[attr-defined]
+            existing_id = orders_cog.active_orders[user.id]  # type: ignore[attr-defined]
+            await interaction.followup.send(
                 embed=brand_embed(
                     title="Order Already Open",
                     description=f"You already have an open order: <#{existing_id}>",
@@ -170,23 +189,20 @@ class OrderSelect(discord.ui.Select):
 
         channel = await create_order_channel(guild, user, service)
         if channel is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=brand_embed(title="Ticket creation failed", description="Could not create your order ticket."),
                 ephemeral=True,
             )
             return
 
         # Track active order
-        self.bot.get_cog("Orders").active_orders[user.id] = channel.id  # type: ignore[attr-defined]
+        orders_cog.active_orders[user.id] = channel.id  # type: ignore[attr-defined]
 
         # Ask for details inside the ticket channel
         await self.ask_for_details(channel, user, service)
 
         # Ack the interaction
-        if interaction.response.is_done():
-            await interaction.followup.send("Order ticket created", ephemeral=True)
-        else:
-            await interaction.response.send_message("Order ticket created", ephemeral=True)
+        await interaction.followup.send("Order ticket created", ephemeral=True)
 
     async def ask_for_details(self, channel: discord.TextChannel, user: discord.User, service: dict) -> None:
         role = channel.guild.get_role(service.get("role_id"))
