@@ -1,37 +1,31 @@
-"""Independent order ticket system using server channels (separate from support)."""
+"""Production-grade ride ticket system using discord.py 2.6+ with Components v2.
+
+Replace BOT_TOKEN, GUILD_ID, and ACTIVE_DRIVER_ROLE_ID before running.
+"""
+
+from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
+
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from src.utils.embeds import brand_embed, BRAND_ACCENT
-from src.utils.ui import build_order_menu_embed, build_order_details_embed
-
-if TYPE_CHECKING:
-    from src.bot import Bot
-
 logger = logging.getLogger(__name__)
 
-ORDER_CATEGORY_NAME = "Orders"
-SERVICES = {
-    "standard": {
-        "label": "Standard Ride",
-        "description": "Pickup and drop-off (limo & blackout tiers).",
-        "role_id": 1405553962010148925,  # Driver role
-    },
-    "getaway": {
-        "label": "Getaway Driver",
-        "description": "Emergency pickup when evading police.",
-        "role_id": 1453927013688807677,  # Getaway Driver role
-    },
-    "transit": {
-        "label": "Transit Services",
-        "description": "Public transportation (bus services).",
-        "role_id": 1409702187851972778,  # Transit role
-    },
+# --- Deployment constants (replace these) ---
+BOT_TOKEN = "MTQ1NDIyMTY4ODI2MTcwNTk3NA.G-aYln.QDYs-wt6my_qgFbWpeQAl1QG8nBctv_v5Kxxyc"
+GUILD_ID = 1405537856365137961  # Replace with your guild/server id
+ACTIVE_DRIVER_ROLE_ID = 1408456213733314592  # Replace with the Active Driver role id
+
+# --- Ticket configuration ---
+ORDER_CATEGORY_NAME = "ride-tickets"
+RIDE_TYPES: dict[str, str] = {
+    "u_driver": "U-Driver",
+    "u_getaway": "U-Getaway Driver",
+    "u_transit": "U-Transit",
 }
 
 
@@ -40,323 +34,279 @@ def _short_id(length: int = 4) -> str:
     return "".join(discord.utils._random.choice(alphabet) for _ in range(length))
 
 
-async def ensure_orders_category(guild: discord.Guild) -> Optional[discord.CategoryChannel]:
-    """Get or create the Orders category (server channels)."""
+async def ensure_category(guild: discord.Guild) -> Optional[discord.CategoryChannel]:
+    """Get or create the category used for ride tickets."""
     for category in guild.categories:
-        if category.name == ORDER_CATEGORY_NAME:
+        if category.name.lower() == ORDER_CATEGORY_NAME.lower():
             return category
     if not guild.me.guild_permissions.manage_channels:
-        logger.warning("Missing manage_channels in %s; cannot create Orders category.", guild.id)
+        logger.warning("Missing manage_channels; cannot create category in guild %s", guild.id)
         return None
     try:
-        category = await guild.create_category(ORDER_CATEGORY_NAME, reason="Create Orders category")
-        logger.info("Created Orders category in guild %s", guild.id)
-        return category
-    except Exception as exc:
-        logger.error("Failed to create Orders category in guild %s: %s", guild.id, exc, exc_info=True)
+        return await guild.create_category(ORDER_CATEGORY_NAME, reason="Create ride ticket category")
+    except Exception as exc:  # pragma: no cover - discord API failure
+        logger.error("Failed to create category in guild %s: %s", guild.id, exc, exc_info=True)
         return None
 
 
-async def create_order_channel(
-    guild: discord.Guild,
-    user: discord.User,
-    service: dict,
+async def create_ticket_channel(
+    guild: discord.Guild, user: discord.User | discord.Member, ride_label: str
 ) -> Optional[discord.TextChannel]:
-    """Create a server ticket channel for an order."""
-    category = await ensure_orders_category(guild)
+    """Create a private ticket channel with enforced overwrites."""
+    category = await ensure_category(guild)
     if category is None:
         return None
 
-    base_username = user.name.lower().replace(" ", "-")[:16]
-    service_slug = service["label"].lower().replace(" ", "-")
-    channel_name = f"order-{base_username}-{service_slug}-{_short_id()}"
+    channel_name = f"ride-{user.name.lower().replace(' ', '-')[:12]}-{ride_label.lower().replace(' ', '-')}-{_short_id()}"
 
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
         guild.me: discord.PermissionOverwrite(
-            view_channel=True, send_messages=True, read_message_history=True, manage_messages=True
+            view_channel=True,
+            send_messages=True,
+            read_message_history=True,
+            manage_messages=True,
+            manage_channels=True,
         ),
         user: discord.PermissionOverwrite(
             view_channel=True, send_messages=True, read_message_history=True, attach_files=True
         ),
     }
 
-    role = guild.get_role(service["role_id"])
-    if role:
-        overwrites[role] = discord.PermissionOverwrite(
-            view_channel=True, send_messages=True, read_message_history=True
+    active_driver_role = guild.get_role(ACTIVE_DRIVER_ROLE_ID)
+    if active_driver_role:
+        overwrites[active_driver_role] = discord.PermissionOverwrite(
+            view_channel=True, send_messages=True, read_message_history=True, attach_files=True
         )
-
-    # Allow admins to see if they have administrator
-    for r in guild.roles:
-        if r.permissions.administrator:
-            overwrites.setdefault(
-                r,
-                discord.PermissionOverwrite(
-                    view_channel=True, send_messages=True, read_message_history=True, manage_messages=True
-                ),
-            )
 
     try:
         channel = await guild.create_text_channel(
-            channel_name,
+            name=channel_name,
             category=category,
             overwrites=overwrites,
-            reason=f"Order ticket for {user} ({service['label']})",
+            reason=f"Ride ticket for {user} ({ride_label})",
         )
-        logger.info("Created order channel %s for user %s (%s)", channel.id, user.id, service["label"])
+        logger.info("Created ride ticket channel %s for user %s", channel.id, user.id)
         return channel
     except discord.Forbidden:
-        logger.warning("Missing permissions to create order channel in guild %s", guild.id)
+        logger.warning("Missing permissions to create ride ticket in guild %s", guild.id)
         return None
-    except Exception as exc:
-        logger.error("Failed to create order channel in guild %s: %s", guild.id, exc, exc_info=True)
+    except Exception as exc:  # pragma: no cover - discord API failure
+        logger.error("Failed to create ride ticket in guild %s: %s", guild.id, exc, exc_info=True)
         return None
 
 
-class OrderSelect(discord.ui.Select):
-    """Select menu for choosing a service; creates server ticket channel."""
+class CloseTicketView(discord.ui.View):
+    """Persistent view with a close button restricted to Active Driver role."""
 
-    def __init__(self, bot: "Bot") -> None:
-        self.bot = bot
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Close Ticket",
+        style=discord.ButtonStyle.danger,
+        custom_id="close_ticket_button",
+    )
+    async def close_ticket(  # type: ignore[override]
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        if interaction.guild is None or interaction.channel is None:
+            await interaction.response.send_message("Cannot close outside a guild channel.", ephemeral=True)
+            return
+
+        driver_role = interaction.guild.get_role(ACTIVE_DRIVER_ROLE_ID)
+        has_access = driver_role and driver_role in interaction.user.roles  # type: ignore[union-attr]
+        if not has_access:
+            await interaction.response.send_message(
+                "Only members with the Active Driver role can close tickets.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_message("Closing ticket in 5 seconds...", ephemeral=False)
+        await asyncio.sleep(5)
+
+        # Delete channel (archive alternative can be implemented here if desired)
+        try:
+            await interaction.channel.delete(reason=f"Ticket closed by {interaction.user}")
+        except discord.Forbidden:
+            await interaction.followup.send("I do not have permission to delete this channel.", ephemeral=True)
+        except Exception as exc:  # pragma: no cover - discord API failure
+            logger.error("Failed to delete ticket channel %s: %s", interaction.channel.id, exc, exc_info=True)
+            await interaction.followup.send("Failed to delete the channel.", ephemeral=True)
+
+
+class RideDetailsModal(discord.ui.Modal, title="Ride Details"):
+    """Modal that collects pickup info and urgency."""
+
+    pickup_location: discord.ui.TextInput
+    urgent: discord.ui.TextInput
+
+    def __init__(self, ride_label: str, channel_id: int) -> None:
+        super().__init__(timeout=None)
+        self.ride_label = ride_label
+        self.channel_id = channel_id
+
+        self.pickup_location = discord.ui.TextInput(
+            label="Pickup location",
+            placeholder="Enter pickup address or landmark",
+            max_length=200,
+            required=True,
+            style=discord.TextStyle.short,
+        )
+        self.urgent = discord.ui.TextInput(
+            label="Is this urgent? (Yes/No)",
+            placeholder="Yes or No",
+            max_length=10,
+            required=True,
+            style=discord.TextStyle.short,
+        )
+        self.add_item(self.pickup_location)
+        self.add_item(self.urgent)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:  # type: ignore[override]
+        channel = interaction.client.get_channel(self.channel_id)  # type: ignore[attr-defined]
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.response.send_message(
+                "Ticket channel not found. Please try again.", ephemeral=True
+            )
+            return
+
+        urgency_raw = self.urgent.value.strip().lower()
+        if urgency_raw not in {"yes", "no"}:
+            # Normalize unexpected input while acknowledging validation.
+            urgency_display = f"Invalid ({self.urgent.value}); treating as No"
+            urgency_value = "No"
+        else:
+            urgency_value = "Yes" if urgency_raw == "yes" else "No"
+            urgency_display = urgency_value
+
+        embed = discord.Embed(
+            title="Ride Ticket",
+            description="Ride request captured.",
+            color=discord.Color.blurple(),
+        )
+        embed.add_field(name="Ride Type", value=self.ride_label, inline=True)
+        embed.add_field(name="Pickup Location", value=self.pickup_location.value.strip(), inline=False)
+        embed.add_field(name="Urgent", value=urgency_display, inline=True)
+        embed.add_field(name="Ticket Creator", value=interaction.user.mention, inline=False)
+        embed.set_footer(text="Close the ticket when fulfilled.")
+        embed.timestamp = discord.utils.utcnow()
+
+        # Components cannot live inside embed fields; attach the view to the message instead.
+        await channel.send(embed=embed, view=CloseTicketView())
+        await interaction.response.send_message(
+            f"Ticket created in {channel.mention}. A driver will assist you shortly.",
+            ephemeral=True,
+        )
+
+
+class RideSelect(discord.ui.Select):
+    """Select menu for ride type selection."""
+
+    def __init__(self) -> None:
         options = [
-            discord.SelectOption(label=data["label"], description=data["description"][:100], value=key)
-            for key, data in SERVICES.items()
+            discord.SelectOption(label=label, value=key)
+            for key, label in RIDE_TYPES.items()
         ]
         super().__init__(
-            placeholder="Select a service to start your order",
+            placeholder="Choose your ride type",
             min_values=1,
             max_values=1,
             options=options,
-            custom_id="order_service_select",
+            custom_id="ride_type_select",
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:  # type: ignore[override]
-        service_key = self.values[0]
-        logger.info("Order selection received from user %s (%s)", interaction.user.id, service_key)
-        try:
-            # Defer immediately to avoid interaction timeouts while we create channels.
-            await interaction.response.defer(ephemeral=True, thinking=False)
-        except Exception as exc:
-            logger.error("Failed to defer order selection for user %s: %s", interaction.user.id, exc, exc_info=True)
-            return
+        ride_key = self.values[0]
+        ride_label = RIDE_TYPES.get(ride_key, "Unknown")
 
-        await self.handle_selection(interaction, service_key)
-
-    async def handle_selection(self, interaction: discord.Interaction, service_key: str) -> None:
-        service = SERVICES.get(service_key)
-        if service is None:
-            await interaction.followup.send(
-                embed=brand_embed(title="Invalid selection", description="That service is not available."),
-                ephemeral=True,
-            )
-            return
-
-        orders_cog = self.bot.get_cog("Orders")
-        if orders_cog is None:
-            await interaction.followup.send(
-                embed=brand_embed(
-                    title="Order system unavailable",
-                    description="Please try again later. (Orders cog not loaded)",
-                ),
-                ephemeral=True,
-            )
-            logger.error("Orders cog missing when handling selection")
-            return
-
-        guild = interaction.guild
-        if guild is None and getattr(self.bot.config, "dev_guild_id", None):
-            guild = self.bot.get_guild(self.bot.config.dev_guild_id)
+        guild = interaction.guild or interaction.client.get_guild(GUILD_ID)  # type: ignore[attr-defined]
         if guild is None:
-            await interaction.followup.send(
-                embed=brand_embed(title="Error", description="No guild context available."), ephemeral=True
-            )
+            await interaction.response.send_message("Guild context missing.", ephemeral=True)
             return
 
-        user = interaction.user
-
-        # Prevent duplicate active orders per user
-        if user.id in orders_cog.active_orders:  # type: ignore[attr-defined]
-            existing_id = orders_cog.active_orders[user.id]  # type: ignore[attr-defined]
-            await interaction.followup.send(
-                embed=brand_embed(
-                    title="Order Already Open",
-                    description=f"You already have an open order: <#{existing_id}>",
-                ),
-                ephemeral=True,
-            )
-            return
-
-        channel = await create_order_channel(guild, user, service)
+        channel = await create_ticket_channel(guild, interaction.user, ride_label)
         if channel is None:
-            await interaction.followup.send(
-                embed=brand_embed(title="Ticket creation failed", description="Could not create your order ticket."),
-                ephemeral=True,
+            await interaction.response.send_message(
+                "Could not create your ticket. Please contact an admin.", ephemeral=True
             )
             return
 
-        # Track active order
-        orders_cog.active_orders[user.id] = channel.id  # type: ignore[attr-defined]
-
-        # Ask for details inside the ticket channel
-        await self.ask_for_details(channel, user, service)
-
-        # Ack the interaction
-        await interaction.followup.send("Order ticket created", ephemeral=True)
-
-    async def ask_for_details(self, channel: discord.TextChannel, user: discord.User, service: dict) -> None:
-        role = channel.guild.get_role(service.get("role_id"))
-        mention = role.mention if role else "Order ticket created"
-        if role is None:
-            logger.warning("Service role missing for %s in guild %s", service.get("label"), channel.guild.id)
-
-        prompt = brand_embed(
-            title=f"{service['label']} Order Intake",
-            description="Please provide the following details:",
-            color=BRAND_ACCENT,
-        )
-        prompt.add_field(name="1) Roblox Username", value="Reply with your Roblox username.", inline=False)
-        prompt.add_field(name="2) Location", value="Reply with your location.", inline=False)
-        prompt.set_footer(text="Please answer in this channel.")
-
+        role = guild.get_role(ACTIVE_DRIVER_ROLE_ID)
+        mention = role.mention if role else ""
         await channel.send(
-            content=mention,
-            embed=prompt,
-            allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False, replied_user=False),
+            content=mention or "Active Driver role not configured.",
+            allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False),
         )
 
-        roblox_username = await self.wait_for_response(channel, user, "Roblox Username", timeout=300)
-        if roblox_username is None:
-            await channel.send(embed=brand_embed(title="Timed Out", description="No response received."))
-            self.cleanup_active(user.id)
-            return
-
-        location = await self.wait_for_response(channel, user, "Location", timeout=300)
-        if location is None:
-            await channel.send(embed=brand_embed(title="Timed Out", description="No response received."))
-            self.cleanup_active(user.id)
-            return
-
-        summary = brand_embed(
-            title="Order Ticket Summary",
-            description=(
-                f"**Service:** {service['label']}\n"
-                f"**User:** {user.mention} (`{user.id}`)\n"
-                f"**Roblox Username:** {roblox_username}\n"
-                f"**Location:** {location}"
-            ),
-            color=BRAND_ACCENT,
-        )
-        summary.set_author(name=str(user), icon_url=user.display_avatar.url)
-        summary.timestamp = discord.utils.utcnow()
-
-        await channel.send(
-            content=mention,
-            embed=summary,
-            allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False, replied_user=False),
-        )
-        logger.info(
-            "Order channel %s finalized for user %s (%s)",
-            channel.id,
-            user.id,
-            service.get("label"),
-        )
-        self.cleanup_active(user.id)
-
-    async def wait_for_response(
-        self,
-        channel: discord.TextChannel,
-        user: discord.User,
-        field: str,
-        timeout: float = 300.0,
-    ) -> Optional[str]:
-        def check(msg: discord.Message) -> bool:
-            return msg.channel.id == channel.id and msg.author.id == user.id
-
-        try:
-            msg = await self.bot.wait_for("message", check=check, timeout=timeout)
-            return msg.content.strip()
-        except asyncio.TimeoutError:
-            return None
-        except Exception as exc:
-            logger.error("Error collecting %s from user %s: %s", field, user.id, exc, exc_info=True)
-            return None
-
-    def cleanup_active(self, user_id: int) -> None:
-        orders_cog = self.bot.get_cog("Orders")
-        if orders_cog and hasattr(orders_cog, "active_orders"):
-            orders_cog.active_orders.pop(user_id, None)
+        # Open the modal to collect details right after selection.
+        await interaction.response.send_modal(RideDetailsModal(ride_label=ride_label, channel_id=channel.id))
 
 
-class OrderView(discord.ui.View):
-    """View that contains the order select menu."""
+class RidePanelView(discord.ui.View):
+    """Persistent view containing the ride selection menu."""
 
-    def __init__(self, bot: "Bot") -> None:
+    def __init__(self) -> None:
         super().__init__(timeout=None)
-        self.add_item(OrderSelect(bot))
+        self.add_item(RideSelect())
 
 
 class Orders(commands.Cog):
-    """Cog for posting the order menu (independent order system)."""
+    """Slash command to post the ride ticket panel."""
 
-    def __init__(self, bot: "Bot") -> None:
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.active_orders: dict[int, int] = {}  # user_id -> channel_id
 
     async def cog_load(self) -> None:
-        """Log cog load and ensure command is registered."""
-        guild = (
-            discord.Object(id=self.bot.config.dev_guild_id)
-            if getattr(self.bot.config, "dev_guild_id", None)
-            else None
-        )
-        try:
-            existing = self.bot.tree.get_command("order-menu", type=discord.AppCommandType.chat_input, guild=guild)
-            if existing:
-                self.bot.tree.remove_command("order-menu", type=discord.AppCommandType.chat_input, guild=guild)
-                logger.info("Removed existing /order-menu before re-registering")
-            self.bot.tree.add_command(self.order_menu, guild=guild)
-            scope = f"guild {guild.id}" if guild else "global scope"
-            logger.info("Registered /order-menu slash command in %s", scope)
-        except Exception as exc:
-            logger.error("Failed to register /order-menu: %s", exc, exc_info=True)
-        try:
-            self.bot.add_view(OrderView(self.bot))
-            logger.info("Registered persistent OrderView (Components v2)")
-        except Exception as exc:
-            logger.error("Failed to register persistent OrderView: %s", exc, exc_info=True)
+        # Register persistent views so components keep working after restarts.
+        self.bot.add_view(RidePanelView())
+        self.bot.add_view(CloseTicketView())
 
-    @app_commands.command(name="order-menu", description="Post the order dropdown menu (Admin only)")
+    @app_commands.command(name="ride-panel", description="Post the ride ticket panel")
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
     @app_commands.default_permissions(administrator=True)
-    @app_commands.checks.has_permissions(administrator=True)
-    async def order_menu(self, interaction: discord.Interaction) -> None:
-        """Post the order embed with dropdown in the current channel."""
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                embed=brand_embed(
-                    title="Permission Denied",
-                    description="You need administrator permissions to use this command.",
-                ),
-                ephemeral=True,
-            )
-            return
+    async def ride_panel(self, interaction: discord.Interaction) -> None:
+        embed = discord.Embed(
+            title="Request a Ride",
+            description=(
+                "Select your ride type below to open a private ticket.\n"
+                "A modal will collect pickup location and urgency."
+            ),
+            color=discord.Color.blurple(),
+        )
+        embed.set_footer(text="Components are attached to this message (not embedded fields).")
 
-        view = OrderView(self.bot)
-        embed = build_order_menu_embed()
-
-        # Send directly to the channel (regular message)
+        view = RidePanelView()
+        # Components must live on the message itself; Discord does not permit placing them inside embed fields.
         await interaction.channel.send(embed=embed, view=view)
 
-        # Ephemeral confirmation to the command user
         if interaction.response.is_done():
-            await interaction.followup.send("Complete", ephemeral=True)
+            await interaction.followup.send("Ride panel posted.", ephemeral=True)
         else:
-            await interaction.response.send_message("Complete", ephemeral=True)
-
-        logger.info("Order menu posted in channel %s by %s", interaction.channel_id, interaction.user.id)
+            await interaction.response.send_message("Ride panel posted.", ephemeral=True)
 
 
-async def setup(bot: "Bot") -> None:
-    """Setup function for the Orders cog."""
+async def setup(bot: commands.Bot) -> None:
+    """Cog setup entrypoint for dynamic loading."""
     await bot.add_cog(Orders(bot))
+
+
+# Optional standalone entrypoint for quick deployment.
+class TicketBot(commands.Bot):
+    def __init__(self) -> None:
+        intents = discord.Intents.default()
+        intents.guilds = True
+        intents.members = True
+        super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self) -> None:
+        await self.add_cog(Orders(self))
+        await self.tree.sync(guild=discord.Object(id=GUILD_ID))
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    bot = TicketBot()
+    bot.run(BOT_TOKEN)
 
