@@ -5,7 +5,7 @@ const {
   SeparatorSpacingSize,
   MessageFlags,
 } = require('discord.js');
-const config = require('../../config.json');
+const { getConfig } = require('./getConfig');
 
 // Maps log type keys to config.json channel ID fields
 const CHANNEL_MAP = {
@@ -24,7 +24,7 @@ async function sendLog(client, type, { label, content }) {
     return;
   }
 
-  const channelId = config[channelKey];
+  const channelId = getConfig()[channelKey];
   if (!channelId) {
     console.warn(`[Logger] Config field "${channelKey}" is missing or empty — skipping ${type} log.`);
     return;

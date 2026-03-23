@@ -1,7 +1,8 @@
 const { REST, Routes } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const config = require('./config.json');
+const { getConfig } = require('./src/utils/getConfig');
+const config = getConfig();
 
 // Reads all command files and deploys them to the configured guild via the Discord REST API
 async function deploy() {

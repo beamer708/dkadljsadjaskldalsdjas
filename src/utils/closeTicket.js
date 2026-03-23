@@ -12,7 +12,7 @@ const {
   MessageFlags,
 } = require('discord.js');
 const { sendLog } = require('./logger');
-const config = require('../../config.json');
+const { getConfig } = require('./getConfig');
 
 // Simple promise-based delay
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -177,7 +177,7 @@ async function generateAndSendTranscript(channel, ticketId, closedByUser, opener
   fs.writeFileSync(filepath, transcriptText, 'utf-8');
 
   // Resolve transcript channel
-  const transcriptChannel = client.channels.cache.get(config.ticketTranscriptChannelId);
+  const transcriptChannel = client.channels.cache.get(getConfig().ticketTranscriptChannelId);
   if (!transcriptChannel) {
     console.warn('[closeTicket] Transcript channel not found (ticketTranscriptChannelId).');
     return;

@@ -4,7 +4,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require('discord.js');
-const config = require('../../config.json');
+const { getConfig } = require('../utils/getConfig');
 const { sendLog } = require('../utils/logger');
 
 // Handles the "Escalate to Staff" button — pings staff and updates the ticket status; one-time use
@@ -50,7 +50,7 @@ module.exports = {
 
     // Ping staff role and send the escalation embed
     await interaction.editReply({
-      content: `<@&${config.staffRoleId}> — this ticket has been escalated.`,
+      content: `<@&${getConfig().staffRoleId}> — this ticket has been escalated.`,
       embeds: [escalateEmbed],
     });
 
@@ -93,7 +93,7 @@ module.exports = {
     });
     await sendLog(interaction.client, 'ticket', {
       label: 'TICKET — Escalated',
-      content: `Ticket ID: ${ticketId}\nUser: ${interaction.user.tag}\nStaff pinged: <@&${config.staffRoleId}>\nTimestamp: <t:${now}:F>`,
+      content: `Ticket ID: ${ticketId}\nUser: ${interaction.user.tag}\nStaff pinged: <@&${getConfig().staffRoleId}>\nTimestamp: <t:${now}:F>`,
     });
   },
 };

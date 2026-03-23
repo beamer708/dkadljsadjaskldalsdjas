@@ -7,7 +7,7 @@ const {
   PermissionFlagsBits,
   MessageFlags,
 } = require('discord.js');
-const config = require('../../config.json');
+const { getConfig } = require('../utils/getConfig');
 const { generateTicketId } = require('../utils/ticketId');
 const { sendLog } = require('../utils/logger');
 
@@ -32,7 +32,7 @@ module.exports = {
       ticketChannel = await guild.channels.create({
         name: channelName,
         type: ChannelType.GuildText,
-        parent: config.supportCategoryId,
+        parent: getConfig().supportCategoryId,
         permissionOverwrites: [
           {
             id: guild.id, // deny @everyone
@@ -43,7 +43,7 @@ module.exports = {
             allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory],
           },
           {
-            id: config.staffRoleId, // allow staff role
+            id: getConfig().staffRoleId, // allow staff role
             allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages],
           },
           {

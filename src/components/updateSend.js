@@ -8,7 +8,7 @@ const {
   ButtonStyle,
   MessageFlags,
 } = require('discord.js');
-const config = require('../../config.json');
+const { getConfig } = require('../utils/getConfig');
 const { draftMap, buildSentContainer } = require('../utils/updateDraft');
 
 module.exports = {
@@ -33,7 +33,7 @@ module.exports = {
       });
     }
 
-    const updatesChannel = await interaction.client.channels.fetch(config.updatesChannelId).catch(() => null);
+    const updatesChannel = await interaction.client.channels.fetch(getConfig().updatesChannelId).catch(() => null);
     if (!updatesChannel) {
       return interaction.reply({ content: 'Updates channel not found. Check config.', flags: MessageFlags.Ephemeral });
     }
@@ -103,7 +103,7 @@ module.exports = {
     }
 
     // Send role ping first, then the panel
-    await updatesChannel.send(`<@&${config.updatesPingRoleId}>`);
+    await updatesChannel.send(`<@&${getConfig().updatesPingRoleId}>`);
     await updatesChannel.send({
       components: [panel],
       flags: MessageFlags.IsComponentsV2,

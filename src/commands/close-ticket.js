@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { isStaff } = require('../utils/permissionCheck');
 const { closeTicket } = require('../utils/closeTicket');
-const config = require('../../config.json');
+const { getConfig } = require('../utils/getConfig');
 
 // Staff-only command — delegates all close logic to closeTicket utility
 module.exports = {
@@ -20,7 +20,7 @@ module.exports = {
     const channel = interaction.channel;
 
     // Ensure this command is used inside a ticket channel in the support category
-    if (channel.parentId !== config.supportCategoryId) {
+    if (channel.parentId !== getConfig().supportCategoryId) {
       return interaction.reply({
         content: 'This command can only be used inside a ticket channel.',
         flags: MessageFlags.Ephemeral,

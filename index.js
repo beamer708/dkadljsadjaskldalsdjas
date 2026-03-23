@@ -1,15 +1,19 @@
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 // NOTE: GuildMembers is a privileged intent — enable it in the Discord Developer Portal
 // under your application > Bot > Privileged Gateway Intents > Server Members Intent
-const config = require('./config.json');
+const { getConfig } = require('./src/utils/getConfig');
 const { loadCommands } = require('./src/handlers/commandHandler');
 const { loadEvents } = require('./src/handlers/eventHandler');
+const { startServer } = require('./src/server');
+
+const config = getConfig();
 
 // Validate all required config fields before attempting to start
 const REQUIRED_FIELDS = [
   'token', 'clientId', 'guildId', 'staffRoleId', 'supportCategoryId',
   'logChannelId', 'joinGateChannelId', 'ticketLogChannelId', 'ticketTranscriptChannelId',
   'updatesChannelId', 'updatesPingRoleId',
+  'applicationChannelId', 'suggestionChannelId', 'communityTeamRoleId', 'betaTesterRoleId',
 ];
 let configValid = true;
 for (const field of REQUIRED_FIELDS) {
@@ -41,4 +45,5 @@ const client = new Client({
   await loadCommands(client);
   await loadEvents(client);
   await client.login(config.token);
+  startServer(client);
 })();
