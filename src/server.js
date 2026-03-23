@@ -13,6 +13,7 @@ const {
   MessageFlags,
 } = require('discord.js');
 const getConfig = require('./utils/getConfig');
+const { generateSuggestionId } = require('./utils/suggestionId');
 
 // --- Environment ---
 
@@ -105,32 +106,63 @@ function buildApplicationPanel(data, { disabled = false, status = null } = {}) {
     );
 }
 
-function buildSuggestionPanel(data, { disabled = false, status = null } = {}) {
-  const { discordId, username, category, title, details } = data;
+function buildSuggestionVotingPanel(data, { disableVotes = false, statusLine = null } = {}) {
+  const { suggestionId, discordId, username, category, title, details, upvotes = 0, downvotes = 0, threadId } = data;
 
-  const infoLines = [
-    `**From:** ${username}`,
+  const headerLines = [
+    `**From:** <@${discordId}> (${username})`,
     `**Category:** ${category}`,
-    `**Title:** ${title}`,
   ];
-  if (status) infoLines.push(status);
+  if (statusLine) headerLines.push(statusLine);
+
+  const voteRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`sug_upvote_${suggestionId}`)
+      .setLabel(`👍  ${upvotes}`)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disableVotes),
+    new ButtonBuilder()
+      .setCustomId(`sug_downvote_${suggestionId}`)
+      .setLabel(`👎  ${downvotes}`)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disableVotes),
+    ...(threadId ? [
+      new ButtonBuilder()
+        .setCustomId(`sug_thread_${threadId}`)
+        .setLabel('💬  View Thread')
+        .setStyle(ButtonStyle.Primary),
+    ] : []),
+  );
+
+  const staffRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`sug_approve_${suggestionId}`)
+      .setLabel('Approve')
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(disableVotes),
+    new ButtonBuilder()
+      .setCustomId(`sug_decline_${suggestionId}`)
+      .setLabel('Decline')
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(disableVotes),
+  );
 
   return new ContainerBuilder()
-    .setAccentColor(0xF5F0E8)
+    .setAccentColor(0x5865F2)
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent('## New Suggestion')
+      new TextDisplayBuilder().setContent(`## ${suggestionId} — Suggestion`)
     )
     .addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     )
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(infoLines.join('\n'))
+      new TextDisplayBuilder().setContent(headerLines.join('\n'))
     )
     .addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     )
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`**Details:**\n${details}`)
+      new TextDisplayBuilder().setContent(`**${title}**\n${details}`)
     )
     .addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
@@ -138,20 +170,8 @@ function buildSuggestionPanel(data, { disabled = false, status = null } = {}) {
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent('-# Submitted via unityvault.space')
     )
-    .addActionRowComponents(
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`sug_approve_${discordId}`)
-          .setLabel('Approve')
-          .setStyle(ButtonStyle.Success)
-          .setDisabled(disabled),
-        new ButtonBuilder()
-          .setCustomId(`sug_decline_${discordId}`)
-          .setLabel('Decline')
-          .setStyle(ButtonStyle.Danger)
-          .setDisabled(disabled),
-      )
-    );
+    .addActionRowComponents(voteRow)
+    .addActionRowComponents(staffRow);
 }
 
 // --- DM helper ---
@@ -249,17 +269,55 @@ function startServer(client) {
     try {
       const { username, discordId, category, title, details } = req.body;
 
-      // Send suggestion panel to suggestionChannelId
+      const suggestionId = generateSuggestionId();
       const sugChannel = await client.channels.fetch(getConfig().suggestionChannelId);
-      const data = { discordId, username, category, title, details };
-      await sugChannel.send({
-        components: [buildSuggestionPanel(data)],
+
+      // Send the public voting panel (no threadId yet)
+      const panelData = { suggestionId, discordId, username, category, title, details, upvotes: 0, downvotes: 0, threadId: null };
+      const sentMsg = await sugChannel.send({
+        components: [buildSuggestionVotingPanel(panelData)],
         flags: MessageFlags.IsComponentsV2,
       });
 
-      // Store in suggestions.json
+      // Create a discussion thread on the panel message
+      let threadId = null;
+      try {
+        const thread = await sentMsg.startThread({
+          name: `${suggestionId} — ${title}`.slice(0, 100),
+          autoArchiveDuration: 10080, // 7 days
+          reason: `Discussion thread for ${suggestionId}`,
+        });
+        threadId = thread.id;
+        await thread.send(`**Discussion thread for ${suggestionId}**\nFeel free to share your thoughts below.`);
+      } catch (err) {
+        console.error('[Server] Failed to create suggestion thread:', err);
+      }
+
+      // Re-edit the panel now that we have the threadId
+      if (threadId) {
+        const updatedData = { ...panelData, threadId };
+        await sentMsg.edit({
+          components: [buildSuggestionVotingPanel(updatedData)],
+          flags: MessageFlags.IsComponentsV2,
+        });
+      }
+
+      // Store all fields in suggestions.json
       const store = readStore(SUGGESTIONS_FILE);
-      store[discordId] = { username, title, category, details };
+      store[suggestionId] = {
+        discordId,
+        username,
+        category,
+        title,
+        details,
+        upvotes: 0,
+        downvotes: 0,
+        voters: [],
+        messageId: sentMsg.id,
+        channelId: sugChannel.id,
+        threadId,
+        status: 'pending',
+      };
       writeStore(SUGGESTIONS_FILE, store);
 
       // DM the submitter
@@ -274,7 +332,7 @@ function startServer(client) {
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
             `Thank you for your suggestion, ${username}.\n\n` +
-            `**${title}** has been submitted to the Unity Vault team for review.\n` +
+            `**${title}** (${suggestionId}) has been posted to the suggestions channel for community voting.\n` +
             `You will receive a DM here once a decision has been made.`
           )
         )
@@ -287,7 +345,7 @@ function startServer(client) {
 
       await sendDm(client, discordId, dmContainer);
 
-      res.json({ success: true });
+      res.json({ success: true, suggestionId });
     } catch (err) {
       console.error('[Server] /api/suggestion error:', err);
       res.status(500).json({ success: false });
@@ -303,7 +361,7 @@ function startServer(client) {
 module.exports = {
   startServer,
   buildApplicationPanel,
-  buildSuggestionPanel,
+  buildSuggestionVotingPanel,
   APPLICATIONS_FILE,
   SUGGESTIONS_FILE,
   readStore,

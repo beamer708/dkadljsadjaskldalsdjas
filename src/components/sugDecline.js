@@ -7,7 +7,7 @@ const {
 } = require('discord.js');
 const { isStaff } = require('../utils/permissionCheck');
 const {
-  buildSuggestionPanel,
+  buildSuggestionVotingPanel,
   SUGGESTIONS_FILE,
   readStore,
   writeStore,
@@ -24,9 +24,9 @@ module.exports = {
       });
     }
 
-    const discordId = interaction.customId.replace('sug_decline_', '');
+    const suggestionId = interaction.customId.replace('sug_decline_', '');
     const store = readStore(SUGGESTIONS_FILE);
-    const sugData = store[discordId];
+    const sugData = store[suggestionId];
 
     if (!sugData) {
       return interaction.reply({
@@ -35,7 +35,14 @@ module.exports = {
       });
     }
 
-    const { username, title } = sugData;
+    if (sugData.status !== 'pending') {
+      return interaction.reply({
+        content: 'This suggestion has already been resolved.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const { discordId, username, title } = sugData;
 
     // DM the submitter
     const dmContainer = new ContainerBuilder()
@@ -49,7 +56,7 @@ module.exports = {
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
           `Thank you for submitting your suggestion to Unity Vault.\n\n` +
-          `After review, we have decided not to move forward with **${title}** at this time.\n` +
+          `After review, we have decided not to move forward with **${title}** (${suggestionId}) at this time.\n` +
           `We appreciate your input and encourage you to share future ideas.`
         )
       )
@@ -67,20 +74,20 @@ module.exports = {
       console.warn(`[SugDecline] Failed to DM user ${discordId}: ${err.message}`);
     }
 
-    // Edit original panel — disable buttons, add status line
-    const fullData = { discordId, ...sugData };
+    // Update store status
+    sugData.status = 'declined';
+    store[suggestionId] = sugData;
+    writeStore(SUGGESTIONS_FILE, store);
+
+    // Edit the panel in the suggestions channel
     await interaction.deferUpdate();
     await interaction.editReply({
-      components: [buildSuggestionPanel(fullData, {
-        disabled: true,
-        status: `**Status:** Declined by ${interaction.user.tag}`,
+      components: [buildSuggestionVotingPanel({ ...sugData, suggestionId }, {
+        disableVotes: true,
+        statusLine: `**Status:** ❌ Declined by ${interaction.user.tag}`,
       })],
       flags: MessageFlags.IsComponentsV2,
     });
-
-    // Remove from store
-    delete store[discordId];
-    writeStore(SUGGESTIONS_FILE, store);
 
     await interaction.followUp({
       content: `Suggestion declined. ${username} has been notified.`,

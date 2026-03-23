@@ -7,7 +7,7 @@ const {
 } = require('discord.js');
 const { isStaff } = require('../utils/permissionCheck');
 const {
-  buildSuggestionPanel,
+  buildSuggestionVotingPanel,
   SUGGESTIONS_FILE,
   readStore,
   writeStore,
@@ -24,9 +24,9 @@ module.exports = {
       });
     }
 
-    const discordId = interaction.customId.replace('sug_approve_', '');
+    const suggestionId = interaction.customId.replace('sug_approve_', '');
     const store = readStore(SUGGESTIONS_FILE);
-    const sugData = store[discordId];
+    const sugData = store[suggestionId];
 
     if (!sugData) {
       return interaction.reply({
@@ -35,7 +35,14 @@ module.exports = {
       });
     }
 
-    const { username, title } = sugData;
+    if (sugData.status !== 'pending') {
+      return interaction.reply({
+        content: 'This suggestion has already been resolved.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const { discordId, username, title } = sugData;
 
     // DM the submitter
     const dmContainer = new ContainerBuilder()
@@ -48,7 +55,7 @@ module.exports = {
       )
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `Your suggestion **${title}** has been approved by the Unity Vault team.\n\n` +
+          `Your suggestion **${title}** (${suggestionId}) has been approved by the Unity Vault team.\n\n` +
           `Thank you for helping improve the community.`
         )
       )
@@ -66,20 +73,20 @@ module.exports = {
       console.warn(`[SugApprove] Failed to DM user ${discordId}: ${err.message}`);
     }
 
-    // Edit original panel — disable buttons, add status line
-    const fullData = { discordId, ...sugData };
+    // Update store status
+    sugData.status = 'approved';
+    store[suggestionId] = sugData;
+    writeStore(SUGGESTIONS_FILE, store);
+
+    // Edit the panel in the suggestions channel
     await interaction.deferUpdate();
     await interaction.editReply({
-      components: [buildSuggestionPanel(fullData, {
-        disabled: true,
-        status: `**Status:** Approved by ${interaction.user.tag}`,
+      components: [buildSuggestionVotingPanel({ ...sugData, suggestionId }, {
+        disableVotes: true,
+        statusLine: `**Status:** ✅ Approved by ${interaction.user.tag}`,
       })],
       flags: MessageFlags.IsComponentsV2,
     });
-
-    // Remove from store
-    delete store[discordId];
-    writeStore(SUGGESTIONS_FILE, store);
 
     await interaction.followUp({
       content: `Suggestion approved. ${username} has been notified.`,
