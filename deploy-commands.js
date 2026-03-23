@@ -1,6 +1,8 @@
 const { REST, Routes } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+// Load .env if present (for local development)
+try { require('dotenv').config(); } catch {}
 const getConfig = require('./src/utils/getConfig');
 const config = getConfig();
 
