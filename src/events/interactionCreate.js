@@ -61,30 +61,6 @@ module.exports = {
       }
     }
 
-    // --- Select menu interactions ---
-    if (interaction.isStringSelectMenu()) {
-      const componentsPath = path.join(__dirname, '../components');
-      const files = fs.readdirSync(componentsPath).filter(f => f.endsWith('.js'));
-
-      for (const file of files) {
-        const component = require(path.join(componentsPath, file));
-        if (component.customId === interaction.customId) {
-          try {
-            await component.execute(interaction);
-          } catch (err) {
-            console.error(`[InteractionCreate] Select menu error (${interaction.customId}):`, err);
-            const msg = { content: 'An error occurred handling that selection.', flags: MessageFlags.Ephemeral };
-            if (interaction.replied || interaction.deferred) {
-              await interaction.followUp(msg);
-            } else {
-              await interaction.reply(msg);
-            }
-          }
-          return;
-        }
-      }
-    }
-
     // --- Modal submissions ---
     if (interaction.isModalSubmit()) {
       const componentsPath = path.join(__dirname, '../components');

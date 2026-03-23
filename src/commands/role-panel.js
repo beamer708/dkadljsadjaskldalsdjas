@@ -5,8 +5,8 @@ const {
   SeparatorBuilder,
   SeparatorSpacingSize,
   ActionRowBuilder,
-  StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   MessageFlags,
   PermissionFlagsBits,
 } = require('discord.js');
@@ -35,53 +35,73 @@ module.exports = {
       });
     }
 
-    const selectMenu = new StringSelectMenuBuilder()
-      .setCustomId('role_select')
-      .setPlaceholder('Choose your roles')
-      .setMinValues(0)
-      .setMaxValues(3)
-      .addOptions(
-        new StringSelectMenuOptionBuilder()
-          .setLabel('Notifications')
-          .setDescription('Receive general Unity Vault notifications')
-          .setValue('role_notifications')
-          .setEmoji('🔔'),
-        new StringSelectMenuOptionBuilder()
-          .setLabel('Updates')
-          .setDescription('Get notified about website and bot updates')
-          .setValue('role_updates')
-          .setEmoji('📢'),
-        new StringSelectMenuOptionBuilder()
-          .setLabel('Server News')
-          .setDescription('Stay informed on Unity Vault server news')
-          .setValue('role_news')
-          .setEmoji('📰'),
-      );
-
     const container = new ContainerBuilder()
       .setAccentColor(0xF5F0E8)
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('## Select Your Roles')
-      )
-      .addSeparatorComponents(
-        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
-      )
+      // Header
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          'Use the menu below to assign yourself notification roles.\nSelect the updates you want to receive.'
+          '## Notification Roles\nSelect the roles you want to receive. Press Toggle to add or remove a role.'
         )
       )
       .addSeparatorComponents(
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
+      // Notifications row
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          '🔔 **Notifications**\nStay updated on general Unity Vault announcements and activity.'
+        )
+      )
       .addActionRowComponents(
-        new ActionRowBuilder().addComponents(selectMenu)
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('role_toggle_notifications')
+            .setLabel('Toggle')
+            .setStyle(ButtonStyle.Secondary),
+        )
       )
       .addSeparatorComponents(
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
+      // Updates row
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('-# You can update your roles at any time.')
+        new TextDisplayBuilder().setContent(
+          '📢 **Updates**\nGet notified about website and bot updates from the Unity Vault team.'
+        )
+      )
+      .addActionRowComponents(
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('role_toggle_updates')
+            .setLabel('Toggle')
+            .setStyle(ButtonStyle.Secondary),
+        )
+      )
+      .addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+      )
+      // Server News row
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          '📰 **Server News**\nStay informed on Unity Vault server news and community developments.'
+        )
+      )
+      .addActionRowComponents(
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('role_toggle_news')
+            .setLabel('Toggle')
+            .setStyle(ButtonStyle.Secondary),
+        )
+      )
+      .addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+      )
+      // Footer
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          '-# Pressing Toggle will add the role if you do not have it, or remove it if you do.'
+        )
       );
 
     await roleChannel.send({
