@@ -31,39 +31,47 @@ module.exports = {
       .setAccentColor(0xF5F0E8)
       // Section 1 — Header
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('## Build Something Worth Joining.')
+        new TextDisplayBuilder().setContent(
+          '## Unity Vault\nThe resource vault built for the ERLC community.'
+        )
       )
-      // Separator
       .addSeparatorComponents(
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
       // Section 2 — Body
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          'Most ERLC servers fail quietly.\n' +
-          'Not because the idea was wrong. Because the foundation was not there.\n\n' +
-          '**Unity Vault** gives you the resources, structure, and direction to build a server that lasts.\n' +
-          'No guesswork. No wasted time. Clear guidance and curated tools, ready to use.'
+          'Built for server owners, designers, and communities who want to\n' +
+          'grow with clarity. No guesswork. No wasted time.\n\n' +
+          'Everything you need is organized and ready to use.'
         )
       )
-      // Separator
       .addSeparatorComponents(
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
-      // Section 3 — Founded line
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-          '**Ready to start?** Visit the website and take the first step.\n' +
-          '-# Unity Vault • Helping ERLC communities grow smarter.'
+      // Section 3 — CTA Buttons
+      .addActionRowComponents(
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setLabel('Enter Vault')
+            .setStyle(ButtonStyle.Link)
+            .setURL('https://unityvault.space'),
+          new ButtonBuilder()
+            .setLabel('Apply to Staff')
+            .setStyle(ButtonStyle.Link)
+            .setURL('https://unityvault.space/staff-application'),
+          new ButtonBuilder()
+            .setLabel('Learn More')
+            .setStyle(ButtonStyle.Link)
+            .setURL('https://unityvault.space/about'),
         )
       )
-      // Separator
       .addSeparatorComponents(
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
-      // Section 4 — Notification role dropdown
+      // Section 4 — Role Selection
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('**Stay in the loop.** Select a notification role below.')
+        new TextDisplayBuilder().setContent('**Stay in the loop.** Pick a notification role below.')
       )
       .addActionRowComponents(
         new ActionRowBuilder().addComponents(
@@ -75,7 +83,7 @@ module.exports = {
             .addOptions(
               new StringSelectMenuOptionBuilder()
                 .setLabel('Notifications')
-                .setDescription('General Unity Vault announcements')
+                .setDescription('General announcements')
                 .setValue('role_notifications'),
               new StringSelectMenuOptionBuilder()
                 .setLabel('Updates')
@@ -83,31 +91,17 @@ module.exports = {
                 .setValue('role_updates'),
               new StringSelectMenuOptionBuilder()
                 .setLabel('Server News')
-                .setDescription('Unity Vault server news')
+                .setDescription('Server news and developments')
                 .setValue('role_news'),
             )
         )
       )
-      // Separator
       .addSeparatorComponents(
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
-      // Section 5 — Link buttons
-      .addActionRowComponents(
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setLabel('Enter Vault')
-            .setStyle(ButtonStyle.Link)
-            .setURL('https://unityvault.space'),
-          new ButtonBuilder()
-            .setLabel('Apply')
-            .setStyle(ButtonStyle.Link)
-            .setURL('https://unityvault.space/staff-application'),
-          new ButtonBuilder()
-            .setLabel('Learn More')
-            .setStyle(ButtonStyle.Link)
-            .setURL('https://unityvault.space/about'),
-        )
+      // Section 5 — Footer
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('-# Helping ERLC communities grow smarter.')
       );
 
     // Send the panel to the channel
