@@ -39,18 +39,14 @@ module.exports = {
       .setAccentColor(0xF5F0E8)
       // Header
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-          '## Notification Roles\nSelect the roles you want to receive. Press Toggle to add or remove a role.'
-        )
+        new TextDisplayBuilder().setContent('## Notification Roles')
       )
       .addSeparatorComponents(
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
       // Notifications row
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-          '🔔 **Notifications**\nStay updated on general Unity Vault announcements and activity.'
-        )
+        new TextDisplayBuilder().setContent('🔔 **Notifications**')
       )
       .addActionRowComponents(
         new ActionRowBuilder().addComponents(
@@ -65,9 +61,7 @@ module.exports = {
       )
       // Updates row
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-          '📢 **Updates**\nGet notified about website and bot updates from the Unity Vault team.'
-        )
+        new TextDisplayBuilder().setContent('📢 **Updates**')
       )
       .addActionRowComponents(
         new ActionRowBuilder().addComponents(
@@ -82,9 +76,7 @@ module.exports = {
       )
       // Server News row
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(
-          '📰 **Server News**\nStay informed on Unity Vault server news and community developments.'
-        )
+        new TextDisplayBuilder().setContent('📰 **Server News**')
       )
       .addActionRowComponents(
         new ActionRowBuilder().addComponents(

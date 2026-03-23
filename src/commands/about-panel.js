@@ -7,6 +7,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   MessageFlags,
 } = require('discord.js');
 const { isStaff } = require('../utils/permissionCheck');
@@ -59,7 +61,38 @@ module.exports = {
       .addSeparatorComponents(
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
-      // Section 4 — Link buttons
+      // Section 4 — Notification role dropdown
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('**Stay in the loop.** Select a notification role below.')
+      )
+      .addActionRowComponents(
+        new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId('about_role_select')
+            .setPlaceholder('Choose a notification role')
+            .setMinValues(0)
+            .setMaxValues(1)
+            .addOptions(
+              new StringSelectMenuOptionBuilder()
+                .setLabel('Notifications')
+                .setDescription('General Unity Vault announcements')
+                .setValue('role_notifications'),
+              new StringSelectMenuOptionBuilder()
+                .setLabel('Updates')
+                .setDescription('Website and bot updates')
+                .setValue('role_updates'),
+              new StringSelectMenuOptionBuilder()
+                .setLabel('Server News')
+                .setDescription('Unity Vault server news')
+                .setValue('role_news'),
+            )
+        )
+      )
+      // Separator
+      .addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+      )
+      // Section 5 — Link buttons
       .addActionRowComponents(
         new ActionRowBuilder().addComponents(
           new ButtonBuilder()
