@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { isStaff } = require('../utils/permissionCheck');
 const { closeTicket } = require('../utils/closeTicket');
-const { getConfig } = require('../utils/getConfig');
+const getConfig = require('../utils/getConfig');
 
 // Staff-only command — delegates all close logic to closeTicket utility
 module.exports = {

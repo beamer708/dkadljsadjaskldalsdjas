@@ -12,7 +12,7 @@ const {
   MessageFlags,
 } = require('discord.js');
 const { sendLog } = require('./logger');
-const { getConfig } = require('./getConfig');
+const getConfig = require('./getConfig');
 
 // Simple promise-based delay
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));

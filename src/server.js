@@ -12,7 +12,7 @@ const {
   ButtonStyle,
   MessageFlags,
 } = require('discord.js');
-const { getConfig } = require('./utils/getConfig');
+const getConfig = require('./utils/getConfig');
 
 // --- Environment ---
 

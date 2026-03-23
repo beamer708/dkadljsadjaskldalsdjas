@@ -5,7 +5,7 @@ const {
   SeparatorSpacingSize,
   MessageFlags,
 } = require('discord.js');
-const { getConfig } = require('../utils/getConfig');
+const getConfig = require('../utils/getConfig');
 const { isStaff } = require('../utils/permissionCheck');
 const {
   buildApplicationPanel,

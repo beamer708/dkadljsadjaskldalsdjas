@@ -5,7 +5,7 @@ const {
   SeparatorSpacingSize,
   MessageFlags,
 } = require('discord.js');
-const { getConfig } = require('./getConfig');
+const getConfig = require('./getConfig');
 
 // Maps log type keys to config.json channel ID fields
 const CHANNEL_MAP = {

@@ -4,7 +4,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require('discord.js');
-const { getConfig } = require('../utils/getConfig');
+const getConfig = require('../utils/getConfig');
 const { sendLog } = require('../utils/logger');
 
 // Handles the "Escalate to Staff" button — pings staff and updates the ticket status; one-time use

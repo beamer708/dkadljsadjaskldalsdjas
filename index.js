@@ -1,29 +1,33 @@
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 // NOTE: GuildMembers is a privileged intent — enable it in the Discord Developer Portal
 // under your application > Bot > Privileged Gateway Intents > Server Members Intent
-const { getConfig } = require('./src/utils/getConfig');
+const getConfig = require('./src/utils/getConfig');
 const { loadCommands } = require('./src/handlers/commandHandler');
 const { loadEvents } = require('./src/handlers/eventHandler');
 const { startServer } = require('./src/server');
 
-const config = getConfig();
+const config = getConfig()
 
-// Validate all required config fields before attempting to start
-const REQUIRED_FIELDS = [
-  'token', 'clientId', 'guildId', 'staffRoleId', 'supportCategoryId',
+const required = ['token', 'clientId', 'guildId']
+const missing = required.filter(key => !config[key])
+
+if (missing.length > 0) {
+  console.error(`STARTUP ERROR: Missing required config values: ${missing.join(', ')}`)
+  console.error('Set these as environment variables on your hosting service.')
+  process.exit(1)
+}
+
+// Warn about optional fields that are missing but won't crash the bot
+const OPTIONAL_FIELDS = [
+  'staffRoleId', 'supportCategoryId',
   'logChannelId', 'joinGateChannelId', 'ticketLogChannelId', 'ticketTranscriptChannelId',
   'updatesChannelId', 'updatesPingRoleId',
   'applicationChannelId', 'suggestionChannelId', 'communityTeamRoleId', 'betaTesterRoleId',
-];
-let configValid = true;
-for (const field of REQUIRED_FIELDS) {
+]
+for (const field of OPTIONAL_FIELDS) {
   if (!config[field]) {
-    console.warn(`[Config] WARNING: Missing or empty required field: "${field}"`);
-    configValid = false;
+    console.warn(`[Config] WARNING: Missing or empty field: "${field}" — related features may not work.`)
   }
-}
-if (!configValid) {
-  console.warn('[Config] One or more required config fields are missing. Some features may not work correctly.');
 }
 
 // Privileged intents required — enable these in the Discord Developer Portal:

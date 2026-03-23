@@ -7,7 +7,7 @@ const {
   PermissionFlagsBits,
   MessageFlags,
 } = require('discord.js');
-const { getConfig } = require('../utils/getConfig');
+const getConfig = require('../utils/getConfig');
 const { generateTicketId } = require('../utils/ticketId');
 const { sendLog } = require('../utils/logger');
 
