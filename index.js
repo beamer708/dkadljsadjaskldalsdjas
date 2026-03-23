@@ -8,13 +8,20 @@ const { startServer } = require('./src/server');
 
 const config = getConfig()
 
-const required = ['token', 'clientId', 'guildId']
-const missing = required.filter(key => !config[key])
-
-if (missing.length > 0) {
-  console.error(`STARTUP ERROR: Missing required config values: ${missing.join(', ')}`)
-  console.error('Set these as environment variables on your hosting service.')
+// Sensitive values must come from environment variables
+const missingSensitive = ['token', 'apiSecret'].filter(key => !config[key])
+if (missingSensitive.length > 0) {
+  for (const key of missingSensitive) {
+    console.error(`STARTUP ERROR: Missing sensitive environment variable: ${key}`)
+  }
+  console.error('Set BOT_TOKEN and API_SECRET on your hosting service.')
   process.exit(1)
+}
+
+// Non-sensitive required values — warn but allow bot to start
+const missingRequired = ['clientId', 'guildId'].filter(key => !config[key])
+for (const key of missingRequired) {
+  console.warn(`CONFIG WARNING: Missing value: "${key}". Related features may not work.`)
 }
 
 // Warn about optional fields that are missing but won't crash the bot
@@ -23,6 +30,8 @@ const OPTIONAL_FIELDS = [
   'logChannelId', 'joinGateChannelId', 'ticketLogChannelId', 'ticketTranscriptChannelId',
   'updatesChannelId', 'updatesPingRoleId',
   'applicationChannelId', 'suggestionChannelId', 'communityTeamRoleId', 'betaTesterRoleId',
+  'partnershipChannelId', 'rolePanelChannelId', 'welcomeChannelId',
+  'notificationsRoleId', 'updatesRoleId', 'serverNewsRoleId',
 ]
 for (const field of OPTIONAL_FIELDS) {
   if (!config[field]) {
@@ -32,12 +41,14 @@ for (const field of OPTIONAL_FIELDS) {
 
 // Privileged intents required — enable these in the Discord Developer Portal:
 //   Application > Bot > Privileged Gateway Intents
-//   - Server Members Intent  → for guildMemberAdd (join logging)
-//   - Message Content Intent → for messageDelete (deleted message logging)
+//   - Server Members Intent  → for guildMemberAdd, guildMemberUpdate (join logging, role changes)
+//   - Message Content Intent → for messageDelete, messageUpdate (message logging)
+// GuildModeration is required for guildBanAdd and guildBanRemove (no portal toggle needed)
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildModeration,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],

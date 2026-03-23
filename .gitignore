@@ -1,27 +1,25 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-.venv
+# Dependencies
+node_modules/
 
-# Discord Bot
-config.json
-tickets.json
+# Sensitive environment variables — never commit
+.env
+
+# Generated data
 transcripts/
 *.log
+tickets.json
+
+# Python compiled files
+__pycache__/
+*.py[cod]
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
-.DS_Store
-Thumbs.db
-

@@ -3,6 +3,10 @@ const {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
   ChannelType,
   PermissionFlagsBits,
   MessageFlags,
@@ -60,7 +64,7 @@ module.exports = {
 
     // Build the ticket embed
     const ticketEmbed = new EmbedBuilder()
-      .setColor(0x5865f2)
+      .setColor(0xF5F0E8)
       .setTitle(`Support Ticket — ${ticketId}`)
       .addFields(
         { name: 'User', value: `${member.user.tag} (<@${member.user.id}>)`, inline: true },
@@ -88,6 +92,33 @@ module.exports = {
 
     // Confirm to the user where their ticket was created
     await interaction.editReply({ content: `Your ticket has been opened: <#${ticketChannel.id}>` });
+
+    // DM the ticket opener
+    try {
+      const dmContainer = new ContainerBuilder()
+        .setAccentColor(0xF5F0E8)
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('## Ticket Opened')
+        )
+        .addSeparatorComponents(
+          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+        )
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            'Your support ticket has been opened with the Unity Vault team.\n' +
+            'A staff member will be with you shortly.'
+          )
+        )
+        .addSeparatorComponents(
+          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+        )
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('-# Unity Vault • Helping ERLC communities grow smarter.')
+        );
+      await member.user.send({ components: [dmContainer], flags: MessageFlags.IsComponentsV2 });
+    } catch {
+      // DMs may be disabled — non-fatal
+    }
 
     // Log the ticket open event
     const now = Math.floor(Date.now() / 1000);

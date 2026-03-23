@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { sendLog } = require('../utils/logger');
+const getConfig = require('../utils/getConfig');
 
 const DAY_MS = 86_400_000;
 
@@ -39,5 +40,21 @@ module.exports = {
         statusLine,
       ].join('\n'),
     });
+
+    // Send welcome message to welcome channel
+    const welcomeChannelId = getConfig().welcomeChannelId;
+    if (welcomeChannelId) {
+      try {
+        const welcomeChannel = await member.client.channels.fetch(welcomeChannelId);
+        if (welcomeChannel) {
+          await welcomeChannel.send({
+            content: `Welcome <@${user.id}> to <:UnityLogo:1483604150586441769> **Unity Vault**\nwe now have **${member.guild.memberCount}** members`,
+            allowedMentions: { users: [user.id] },
+          });
+        }
+      } catch (err) {
+        console.error('[guildMemberAdd] Failed to send welcome message:', err.message);
+      }
+    }
   },
 };

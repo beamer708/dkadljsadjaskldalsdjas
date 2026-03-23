@@ -1,8 +1,12 @@
 const {
-  EmbedBuilder,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MessageFlags,
 } = require('discord.js');
 const getConfig = require('../utils/getConfig');
 const { sendLog } = require('../utils/logger');
@@ -36,22 +40,37 @@ module.exports = {
       }
     }
 
-    // Build the escalation embed
-    const escalateEmbed = new EmbedBuilder()
-      .setColor(0xed4245)
-      .setTitle(`Ticket Escalated — ${ticketId}`)
-      .addFields(
-        { name: 'User', value: `${interaction.user.tag}`, inline: true },
-        { name: 'Status', value: '🔴 Escalated', inline: true },
-        { name: 'Escalated At', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+    // Build the escalation container
+    const now = Math.floor(Date.now() / 1000);
+    const escalateContainer = new ContainerBuilder()
+      .setAccentColor(0xF5F0E8)
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('## Ticket Escalated')
       )
-      .setFooter({ text: 'Unity Vault Support' })
-      .setTimestamp();
+      .addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+      )
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          `This ticket has been escalated to the staff team.\n` +
+          `**Ticket ID:** ${ticketId}\n` +
+          `**User:** ${interaction.user.tag}\n` +
+          `**Time:** <t:${now}:F>`
+        )
+      )
+      .addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+      )
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('-# Unity Vault • Staff have been notified.')
+      );
 
-    // Ping staff role and send the escalation embed
-    await interaction.editReply({
-      content: `<@&${getConfig().staffRoleId}> — this ticket has been escalated.`,
-      embeds: [escalateEmbed],
+    // Ping staff role as a plain message, then send the container
+    await interaction.editReply({ content: `<@&${getConfig().staffRoleId}>` });
+    await interaction.followUp({
+      components: [escalateContainer],
+      flags: MessageFlags.IsComponentsV2,
+      allowedMentions: { parse: [] },
     });
 
     // Update the original ticket embed: change Status field to Escalated
@@ -86,7 +105,6 @@ module.exports = {
     }
 
     // Log the escalation event
-    const now = Math.floor(Date.now() / 1000);
     await sendLog(interaction.client, 'action', {
       label: 'ACTION — Ticket Escalated',
       content: `User: ${interaction.user.tag}\nUser ID: ${interaction.user.id}\nTicket ID: ${ticketId}\nEscalated by: ${interaction.user.tag}`,

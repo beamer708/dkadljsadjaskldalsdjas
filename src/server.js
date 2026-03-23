@@ -27,6 +27,7 @@ if (!getConfig().apiSecret) {
 
 const APPLICATIONS_FILE = path.join(__dirname, '../applications.json');
 const SUGGESTIONS_FILE = path.join(__dirname, '../suggestions.json');
+const PARTNERSHIPS_FILE = path.join(__dirname, '../partnerships.json');
 
 // --- JSON store helpers ---
 
@@ -172,6 +173,62 @@ function buildSuggestionVotingPanel(data, { disableVotes = false, statusLine = n
     )
     .addActionRowComponents(voteRow)
     .addActionRowComponents(staffRow);
+}
+
+function buildPartnershipPanel(data, { disabled = false, status = null } = {}) {
+  const { serverName, inviteLink, serverType, reason, offering } = data;
+  const key = serverName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 80);
+
+  const infoLines = [
+    `**Server Name:** ${serverName}`,
+    `**Invite Link:** ${inviteLink}`,
+    `**Server Type:** ${serverType}`,
+  ];
+  if (status) infoLines.push(status);
+
+  return new ContainerBuilder()
+    .setAccentColor(0xF5F0E8)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent('## New Partnership Application')
+    )
+    .addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(infoLines.join('\n'))
+    )
+    .addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`**Why do they want to partner?**\n${reason}`)
+    )
+    .addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`**What do they offer the ERLC community?**\n${offering}`)
+    )
+    .addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent('-# Submitted via unityvault.space')
+    )
+    .addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`partner_approve_${key}`)
+          .setLabel('Approve')
+          .setStyle(ButtonStyle.Success)
+          .setDisabled(disabled),
+        new ButtonBuilder()
+          .setCustomId(`partner_deny_${key}`)
+          .setLabel('Deny')
+          .setStyle(ButtonStyle.Danger)
+          .setDisabled(disabled),
+      )
+    );
 }
 
 // --- DM helper ---
@@ -352,6 +409,39 @@ function startServer(client) {
     }
   });
 
+  // POST /api/partnership
+  app.post('/api/partnership', async (req, res) => {
+    try {
+      const { serverName, inviteLink, serverType, reason, offering } = req.body;
+
+      const key = serverName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 80);
+
+      const partnerChannel = await client.channels.fetch(getConfig().partnershipChannelId);
+      const data = { serverName, inviteLink, serverType, reason, offering };
+      await partnerChannel.send({
+        components: [buildPartnershipPanel(data)],
+        flags: MessageFlags.IsComponentsV2,
+      });
+
+      const store = readStore(PARTNERSHIPS_FILE);
+      store[key] = {
+        serverName,
+        inviteLink,
+        serverType,
+        reason,
+        offering,
+        status: 'pending',
+        timestamp: new Date().toISOString(),
+      };
+      writeStore(PARTNERSHIPS_FILE, store);
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('[Server] /api/partnership error:', err);
+      res.status(500).json({ success: false });
+    }
+  });
+
   // Bind to 0.0.0.0 — required for hosted environments to expose the port
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`)
@@ -362,8 +452,10 @@ module.exports = {
   startServer,
   buildApplicationPanel,
   buildSuggestionVotingPanel,
+  buildPartnershipPanel,
   APPLICATIONS_FILE,
   SUGGESTIONS_FILE,
+  PARTNERSHIPS_FILE,
   readStore,
   writeStore,
 };

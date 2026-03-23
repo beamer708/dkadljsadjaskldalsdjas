@@ -58,6 +58,7 @@ async function sendLog(client, type, { label, content }) {
   await channel.send({
     components: [container],
     flags: MessageFlags.IsComponentsV2,
+    allowedMentions: { parse: [] },
   }).catch(err => console.error(`[Logger] Failed to send "${type}" log:`, err.message));
 }
 

@@ -63,7 +63,7 @@ module.exports = {
       .addActionRowComponents(
         new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setLabel('Visit Website')
+            .setLabel('Enter Vault')
             .setStyle(ButtonStyle.Link)
             .setURL('https://unityvault.space'),
           new ButtonBuilder()

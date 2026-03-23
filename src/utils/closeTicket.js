@@ -27,8 +27,38 @@ async function closeTicket(channel, ticketId, closedByUser, client) {
     ? await client.users.fetch(openerOverwrite.id).catch(() => null)
     : null;
 
-  // STEP 1 — Send loading message to the ticket channel
+  // STEP 1 — DM the ticket opener
+  if (openerUser) {
+    try {
+      const resolvedDm = new ContainerBuilder()
+        .setAccentColor(0xF5F0E8)
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('## Ticket Resolved')
+        )
+        .addSeparatorComponents(
+          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+        )
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            'Your support ticket has been marked as resolved.\n' +
+            'If you need further assistance, feel free to open a new ticket.'
+          )
+        )
+        .addSeparatorComponents(
+          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+        )
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('-# Unity Vault • Helping ERLC communities grow smarter.')
+        );
+      await openerUser.send({ components: [resolvedDm], flags: MessageFlags.IsComponentsV2 });
+    } catch {
+      // DMs may be disabled — non-fatal
+    }
+  }
+
+  // STEP 2 — Send loading message to the ticket channel
   const loadingContainer = new ContainerBuilder()
+    .setAccentColor(0xF5F0E8)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent('## Closing Ticket')
     )
@@ -51,7 +81,7 @@ async function closeTicket(channel, ticketId, closedByUser, client) {
     console.error('[closeTicket] Failed to send loading message:', err.message);
   }
 
-  // STEP 2 — Run transcript + logs + 4s delay concurrently
+  // STEP 3 — Run transcript + logs + 4s delay concurrently
   await Promise.all([
     generateAndSendTranscript(channel, ticketId, closedByUser, openerUser, client),
     disableTicketButtons(channel, ticketId),
@@ -59,9 +89,10 @@ async function closeTicket(channel, ticketId, closedByUser, client) {
     delay(4000),
   ]);
 
-  // STEP 3 — Edit loading message to closed confirmation
+  // STEP 4 — Edit loading message to closed confirmation
   if (loadingMsg) {
     const closedContainer = new ContainerBuilder()
+      .setAccentColor(0xF5F0E8)
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent('## Ticket Closed')
       )
@@ -78,7 +109,7 @@ async function closeTicket(channel, ticketId, closedByUser, client) {
       )
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          '-# Unity Vault — Helping ERLC communities grow smarter.'
+          '-# Unity Vault • Helping ERLC communities grow smarter.'
         )
       );
 
@@ -88,7 +119,7 @@ async function closeTicket(channel, ticketId, closedByUser, client) {
     }).catch(err => console.error('[closeTicket] Failed to edit loading message:', err.message));
   }
 
-  // STEP 4 — Delete the ticket channel (3s grace period so the closed message is visible)
+  // STEP 5 — Delete the ticket channel (3s grace period so the closed message is visible)
   await delay(3000);
   await channel.delete('Ticket closed')
     .catch(err => console.error('[closeTicket] Failed to delete channel:', err.message));
