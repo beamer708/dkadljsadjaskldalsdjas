@@ -1,4 +1,14 @@
-const { Events } = require('discord.js');
+const {
+  Events,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags,
+} = require('discord.js');
 const { sendLog } = require('../utils/logger');
 const getConfig = require('../utils/getConfig');
 
@@ -47,8 +57,41 @@ module.exports = {
       try {
         const welcomeChannel = await member.client.channels.fetch(welcomeChannelId);
         if (welcomeChannel) {
+          const welcomeContainer = new ContainerBuilder()
+            .setAccentColor(0xF5F0E8)
+            .addTextDisplayComponents(
+              new TextDisplayBuilder().setContent(
+                `## Welcome to Unity Vault\nHey <@${user.id}>, glad to have you here.`
+              )
+            )
+            .addSeparatorComponents(
+              new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+            )
+            .addActionRowComponents(
+              new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                  .setCustomId(`welcome_membercount_${user.id}`)
+                  .setLabel(`${member.guild.memberCount} Members`)
+                  .setStyle(ButtonStyle.Secondary)
+                  .setDisabled(true),
+                new ButtonBuilder()
+                  .setLabel('Visit About')
+                  .setStyle(ButtonStyle.Link)
+                  .setURL(`https://discord.com/channels/${member.guild.id}/1485008114339283174`),
+              )
+            )
+            .addSeparatorComponents(
+              new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+            )
+            .addTextDisplayComponents(
+              new TextDisplayBuilder().setContent(
+                '-# Unity Vault • Helping ERLC communities grow smarter.'
+              )
+            );
+
           await welcomeChannel.send({
-            content: `Welcome <@${user.id}> to <:UnityLogo:1483604150586441769> **Unity Vault**\nwe now have **${member.guild.memberCount}** members`,
+            components: [welcomeContainer],
+            flags: MessageFlags.IsComponentsV2,
             allowedMentions: { users: [user.id] },
           });
         }
