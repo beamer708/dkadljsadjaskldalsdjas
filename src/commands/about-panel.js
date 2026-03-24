@@ -20,6 +20,7 @@ module.exports = {
     .setDescription('Post the Unity Vault about panel to this channel'),
 
   async execute(interaction) {
+    console.log('about-panel command executed');
     if (!isStaff(interaction)) {
       return interaction.reply({
         content: 'You do not have permission to use this command.',

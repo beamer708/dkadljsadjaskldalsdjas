@@ -19,6 +19,7 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
+    console.log('role-panel command executed');
     const rolePanelChannelId = getConfig().rolePanelChannelId;
     if (!rolePanelChannelId) {
       return interaction.reply({
