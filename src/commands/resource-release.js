@@ -3,24 +3,19 @@ const {
   PermissionFlagsBits,
   MessageFlags,
 } = require('discord.js');
-const { draftMap, buildSetupContainer } = require('../utils/updateDraft');
+const { draftMap, buildSetupContainer } = require('../utils/resourceDraft');
 
 // Admin-only command — creates a draft and sends the ephemeral setup panel
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('website-update')
-    .setDescription('Post a website update announcement')
+    .setName('resource-release')
+    .setDescription('Post a tool/resource release announcement')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    // Initialize a fresh draft for this user
     draftMap.set(interaction.user.id, {
-      version: null,
       title: null,
       description: null,
-      improvements: [],
-      bugs: [],
-      viewUrl: '',
       imageUrl: null,
       sentBy: interaction.user.tag,
     });

@@ -6,6 +6,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
   MessageFlags,
 } = require('discord.js');
 const getConfig = require('../utils/getConfig');
@@ -53,6 +55,18 @@ module.exports = {
       .addSeparatorComponents(
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       );
+
+    // Optional image
+    if (draft.imageUrl) {
+      panel.addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(
+          new MediaGalleryItemBuilder().setURL(draft.imageUrl)
+        )
+      );
+      panel.addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+      );
+    }
 
     // Conditional improvements section
     if (draft.improvements.length > 0) {

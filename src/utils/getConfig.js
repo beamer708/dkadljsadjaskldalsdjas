@@ -27,6 +27,8 @@ function getConfig() {
     ticketTranscriptChannelId:  process.env.TICKET_TRANSCRIPT_CHANNEL_ID || fileConfig.ticketTranscriptChannelId,
     updatesChannelId:           process.env.UPDATES_CHANNEL_ID           || fileConfig.updatesChannelId,
     updatesPingRoleId:          process.env.UPDATES_PING_ROLE_ID         || fileConfig.updatesPingRoleId,
+    resourcesChannelId:         process.env.RESOURCES_CHANNEL_ID         || fileConfig.resourcesChannelId,
+    resourcesPingRoleId:        process.env.RESOURCES_PING_ROLE_ID       || fileConfig.resourcesPingRoleId,
     applicationChannelId:       process.env.APPLICATION_CHANNEL_ID       || fileConfig.applicationChannelId,
     suggestionChannelId:        process.env.SUGGESTION_CHANNEL_ID        || fileConfig.suggestionChannelId,
     partnershipChannelId:       process.env.PARTNERSHIP_CHANNEL_ID       || fileConfig.partnershipChannelId,
