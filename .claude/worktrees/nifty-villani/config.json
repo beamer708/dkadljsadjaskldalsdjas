@@ -1,0 +1,22 @@
+{
+  "clientId": "1485339891079577880",
+  "guildId": "1205037574087770175",
+  "staffRoleId": "1485009683671552010",
+  "supportCategoryId": "1485344810515562557",
+  "logChannelId": "1485351323816956064",
+  "joinGateChannelId": "1485352897150713916",
+  "ticketLogChannelId": "1485352003436544030",
+  "ticketTranscriptChannelId": "1485352031471272156",
+  "updatesChannelId": "1485008114339283174",
+  "updatesPingRoleId": "1485363206116348164",
+  "applicationChannelId": "1485394744321245214",
+  "suggestionChannelId": "1485394815788257481",
+  "partnershipChannelId": "1485482768917074142",
+  "rolePanelChannelId": "1485008262821843225",
+  "welcomeChannelId": "1483615235154903232",
+  "communityTeamRoleId": "1485009683671552010",
+  "betaTesterRoleId": "1485009683671552010",
+  "notificationsRoleId": "1485745906539302972",
+  "updatesRoleId": "1485745951451775211",
+  "serverNewsRoleId": "1485746083635400954"
+}

@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Sensitive environment variables — never commit
+.env
+
+# Generated data
+transcripts/
+*.log
+tickets.json
+
+# Python compiled files
+__pycache__/
+*.py[cod]
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

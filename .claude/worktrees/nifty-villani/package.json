@@ -1,0 +1,21 @@
+{
+  "name": "unity-vault-support-bot",
+  "version": "1.0.0",
+  "description": "Discord support bot for Unity Vault — ERLC community resource server",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "discord.js": "^14.16.3",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "dotenv": "^17.3.1"
+  }
+}
