@@ -1,3 +1,4 @@
+try { require('dotenv').config(); } catch {}
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 // NOTE: GuildMembers is a privileged intent — enable it in the Discord Developer Portal
 // under your application > Bot > Privileged Gateway Intents > Server Members Intent

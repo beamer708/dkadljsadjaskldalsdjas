@@ -29,6 +29,7 @@ async function deploy() {
   );
 
   console.log(`[Deploy] Successfully registered ${data.length} command(s).`);
+  console.log('[Deploy] Commands registered:', commands.map(c => c.name).join(', '));
 }
 
 deploy().catch(err => {
