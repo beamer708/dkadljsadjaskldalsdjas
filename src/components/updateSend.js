@@ -42,7 +42,7 @@ module.exports = {
 
     // Build the public update panel
     const panel = new ContainerBuilder()
-      .setAccentColor(0xF5F0E8)
+      .setAccentColor(0x52D973)
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(`## ${draft.title}`)
       )

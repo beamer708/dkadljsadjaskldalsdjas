@@ -20,7 +20,7 @@ function buildSetupContainer(draft) {
   const imageUrl    = draft.imageUrl    || '_not set_';
 
   return new ContainerBuilder()
-    .setAccentColor(0xF5F0E8)
+    .setAccentColor(0x52D973)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent('## Resource Release — Draft')
     )
@@ -55,7 +55,7 @@ function buildSetupContainer(draft) {
 // Build the ephemeral sent confirmation panel
 function buildSentContainer(draft) {
   return new ContainerBuilder()
-    .setAccentColor(0x57F287)
+    .setAccentColor(0x52D973)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent('## Resource Release Sent')
     )
@@ -73,7 +73,7 @@ function buildSentContainer(draft) {
 // Build the cancelled panel
 function buildCancelledContainer() {
   return new ContainerBuilder()
-    .setAccentColor(0xED4245)
+    .setAccentColor(0xE24B4A)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent('## Cancelled\nThe resource release draft has been discarded.')
     );

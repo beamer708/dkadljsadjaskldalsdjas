@@ -37,7 +37,7 @@ module.exports = {
     }
 
     const container = new ContainerBuilder()
-      .setAccentColor(0xF5F0E8)
+      .setAccentColor(0x52D973)
       // Header
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent('## Notification Roles')

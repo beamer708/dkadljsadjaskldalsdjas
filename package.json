@@ -1,7 +1,7 @@
 {
-  "name": "unity-vault-support-bot",
+  "name": "howtoerlc-bot",
   "version": "1.0.0",
-  "description": "Discord support bot for Unity Vault — ERLC community resource server",
+  "description": "Official Discord bot for @howtoerlc",
   "main": "index.js",
   "scripts": {
     "start": "node deploy-commands.js && node index.js",

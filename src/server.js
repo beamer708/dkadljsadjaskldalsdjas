@@ -14,6 +14,7 @@ const {
 } = require('discord.js');
 const getConfig = require('./utils/getConfig');
 const { generateSuggestionId } = require('./utils/suggestionId');
+const { generateApplicationId } = require('./utils/applicationId');
 
 // --- Environment ---
 
@@ -51,7 +52,7 @@ function writeStore(fp, data) {
 // --- Panel builders ---
 
 function buildApplicationPanel(data, { disabled = false, status = null } = {}) {
-  const { discordId, username, age, timezone, reason, experience, roleApplying } = data;
+  const { discordId, username, age, timezone, reason, experience, roleApplying, applicationId } = data;
 
   const infoLines = [
     `**Applicant:** ${username}`,
@@ -62,10 +63,14 @@ function buildApplicationPanel(data, { disabled = false, status = null } = {}) {
   ];
   if (status) infoLines.push(status);
 
+  const titleLine = applicationId
+    ? `## Staff Application — ${applicationId}`
+    : `## Staff Application`;
+
   return new ContainerBuilder()
-    .setAccentColor(0xF5F0E8)
+    .setAccentColor(0x52D973)
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent('## New Application')
+      new TextDisplayBuilder().setContent(titleLine)
     )
     .addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
@@ -89,7 +94,7 @@ function buildApplicationPanel(data, { disabled = false, status = null } = {}) {
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     )
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent('-# Submitted via unityvault.space')
+      new TextDisplayBuilder().setContent(`-# Submitted by ${username} · ${discordId}`)
     )
     .addActionRowComponents(
       new ActionRowBuilder().addComponents(
@@ -110,11 +115,14 @@ function buildApplicationPanel(data, { disabled = false, status = null } = {}) {
 function buildSuggestionVotingPanel(data, { disableVotes = false, statusLine = null } = {}) {
   const { suggestionId, discordId, username, category, title, details, upvotes = 0, downvotes = 0, threadId } = data;
 
-  const headerLines = [
-    `**From:** <@${discordId}> (${username})`,
+  const statusText = statusLine || '**Status:** Pending';
+
+  const infoLines = [
+    `**Suggestion ID:** ${suggestionId}`,
+    `**Submitted by:** <@${discordId}> (${username})`,
     `**Category:** ${category}`,
+    statusText,
   ];
-  if (statusLine) headerLines.push(statusLine);
 
   const voteRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -149,27 +157,27 @@ function buildSuggestionVotingPanel(data, { disableVotes = false, statusLine = n
   );
 
   return new ContainerBuilder()
-    .setAccentColor(0x5865F2)
+    .setAccentColor(0xEF9F27)
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`## ${suggestionId} — Suggestion`)
+      new TextDisplayBuilder().setContent(`## ${title}`)
     )
     .addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     )
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(headerLines.join('\n'))
+      new TextDisplayBuilder().setContent(details)
     )
     .addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     )
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`**${title}**\n${details}`)
+      new TextDisplayBuilder().setContent(infoLines.join('\n'))
     )
     .addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     )
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent('-# Submitted via unityvault.space')
+      new TextDisplayBuilder().setContent('-# @howtoerlc Suggestions')
     )
     .addActionRowComponents(voteRow)
     .addActionRowComponents(staffRow);
@@ -187,7 +195,7 @@ function buildPartnershipPanel(data, { disabled = false, status = null } = {}) {
   if (status) infoLines.push(status);
 
   return new ContainerBuilder()
-    .setAccentColor(0xF5F0E8)
+    .setAccentColor(0x52D973)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent('## New Partnership Application')
     )
@@ -213,7 +221,7 @@ function buildPartnershipPanel(data, { disabled = false, status = null } = {}) {
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     )
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent('-# Submitted via unityvault.space')
+      new TextDisplayBuilder().setContent('-# Submitted via @howtoerlc website')
     )
     .addActionRowComponents(
       new ActionRowBuilder().addComponents(
@@ -271,27 +279,38 @@ function startServer(client) {
   // Apply secret validation to all routes
   app.use(validateSecret);
 
-  // POST /api/application
+  // POST /api/application — creates a forum thread in the staff applications forum channel
   app.post('/api/application', async (req, res) => {
     try {
       const { username, discordId, age, timezone, reason, experience, roleApplying } = req.body;
 
-      // Send application panel to applicationChannelId
-      const appChannel = await client.channels.fetch(getConfig().applicationChannelId);
-      const data = { discordId, username, age, timezone, reason, experience: experience || '', roleApplying };
-      await appChannel.send({
-        components: [buildApplicationPanel(data)],
-        flags: MessageFlags.IsComponentsV2,
-      });
+      const appId = generateApplicationId();
+      const data = { discordId, username, age, timezone, reason, experience: experience || '', roleApplying, applicationId: appId };
 
-      // Store in applications.json
+      // Create a new forum thread for this application
+      let thread;
+      try {
+        const forumChannel = await client.channels.fetch(getConfig().staffForumChannelId);
+        thread = await forumChannel.threads.create({
+          name: `Application — ${username} — ${appId}`,
+          message: {
+            components: [buildApplicationPanel(data)],
+            flags: MessageFlags.IsComponentsV2,
+          },
+        });
+      } catch (error) {
+        console.error('[Forum] Failed to create application thread:', error.message);
+        return res.status(500).json({ error: 'Failed to post to forum channel' });
+      }
+
+      // Store in applications.json (keyed by discordId for accept/deny lookups)
       const store = readStore(APPLICATIONS_FILE);
-      store[discordId] = { username, age, timezone, reason, experience: experience || '', roleApplying };
+      store[discordId] = { applicationId: appId, username, age, timezone, reason, experience: experience || '', roleApplying };
       writeStore(APPLICATIONS_FILE, store);
 
       // DM the applicant
       const dmContainer = new ContainerBuilder()
-        .setAccentColor(0xF5F0E8)
+        .setAccentColor(0x52D973)
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent('## Application Received')
         )
@@ -300,7 +319,7 @@ function startServer(client) {
         )
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
-            `Thank you for applying to Unity Vault, ${username}.\n\n` +
+            `Thank you for applying to @howtoerlc, ${username}.\n\n` +
             `Your application for **${roleApplying}** has been received and is currently under review.\n` +
             `You will receive a DM here when a decision has been made.`
           )
@@ -309,7 +328,7 @@ function startServer(client) {
           new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
         )
         .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent('-# Unity Vault • Helping ERLC communities grow smarter.')
+          new TextDisplayBuilder().setContent('-# @howtoerlc — Built for ERLC communities that mean business.')
         );
 
       await sendDm(client, discordId, dmContainer);
@@ -321,45 +340,32 @@ function startServer(client) {
     }
   });
 
-  // POST /api/suggestion
+  // POST /api/suggestion — creates a forum thread in the suggestions forum channel
   app.post('/api/suggestion', async (req, res) => {
     try {
       const { username, discordId, category, title, details } = req.body;
 
       const suggestionId = generateSuggestionId();
-      const sugChannel = await client.channels.fetch(getConfig().suggestionChannelId);
-
-      // Send the public voting panel (no threadId yet)
       const panelData = { suggestionId, discordId, username, category, title, details, upvotes: 0, downvotes: 0, threadId: null };
-      const sentMsg = await sugChannel.send({
-        components: [buildSuggestionVotingPanel(panelData)],
-        flags: MessageFlags.IsComponentsV2,
-      });
 
-      // Create a discussion thread on the panel message
-      let threadId = null;
+      // Create a new forum thread for this suggestion
+      let thread;
       try {
-        const thread = await sentMsg.startThread({
+        const forumChannel = await client.channels.fetch(getConfig().suggestionForumChannelId);
+        thread = await forumChannel.threads.create({
           name: `${suggestionId} — ${title}`.slice(0, 100),
-          autoArchiveDuration: 10080, // 7 days
-          reason: `Discussion thread for ${suggestionId}`,
+          message: {
+            components: [buildSuggestionVotingPanel(panelData)],
+            flags: MessageFlags.IsComponentsV2,
+          },
         });
-        threadId = thread.id;
-        await thread.send(`**Discussion thread for ${suggestionId}**\nFeel free to share your thoughts below.`);
-      } catch (err) {
-        console.error('[Server] Failed to create suggestion thread:', err);
+      } catch (error) {
+        console.error('[Forum] Failed to create suggestion thread:', error.message);
+        return res.status(500).json({ error: 'Failed to post to forum channel' });
       }
 
-      // Re-edit the panel now that we have the threadId
-      if (threadId) {
-        const updatedData = { ...panelData, threadId };
-        await sentMsg.edit({
-          components: [buildSuggestionVotingPanel(updatedData)],
-          flags: MessageFlags.IsComponentsV2,
-        });
-      }
-
-      // Store all fields in suggestions.json
+      // Store all fields — channelId and messageId both point to the thread
+      // (forum thread ID === first message ID in Discord)
       const store = readStore(SUGGESTIONS_FILE);
       store[suggestionId] = {
         discordId,
@@ -370,16 +376,16 @@ function startServer(client) {
         upvotes: 0,
         downvotes: 0,
         voters: [],
-        messageId: sentMsg.id,
-        channelId: sugChannel.id,
-        threadId,
+        messageId: thread.id,
+        channelId: thread.id,
+        threadId: null,
         status: 'pending',
       };
       writeStore(SUGGESTIONS_FILE, store);
 
       // DM the submitter
       const dmContainer = new ContainerBuilder()
-        .setAccentColor(0xF5F0E8)
+        .setAccentColor(0x52D973)
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent('## Suggestion Received')
         )
@@ -397,7 +403,7 @@ function startServer(client) {
           new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
         )
         .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent('-# Unity Vault • Helping ERLC communities grow smarter.')
+          new TextDisplayBuilder().setContent('-# @howtoerlc — Built for ERLC communities that mean business.')
         );
 
       await sendDm(client, discordId, dmContainer);

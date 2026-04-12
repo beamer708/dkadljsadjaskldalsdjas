@@ -16,7 +16,7 @@ const { isStaff } = require('../utils/permissionCheck');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('panel')
-    .setDescription('Post the Unity Vault panel to this channel'),
+    .setDescription('Post the @howtoerlc panel to this channel'),
 
   async execute(interaction) {
     if (!isStaff(interaction)) {
@@ -27,11 +27,11 @@ module.exports = {
     }
 
     const container = new ContainerBuilder()
-      .setAccentColor(0xF5F0E8)
+      .setAccentColor(0x52D973)
       // About — Header
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          '## Unity Vault\nThe resource vault built for the ERLC community.'
+          '## @howtoerlc\nA curated resource vault built for ERLC communities that mean business.'
         )
       )
       .addSeparatorComponents(
@@ -123,7 +123,7 @@ module.exports = {
       // Footer
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          '-# Helping ERLC communities grow smarter. · Pressing Toggle will add or remove the role.'
+          '-# @howtoerlc — Built for ERLC communities that mean business. · Pressing Toggle will add or remove the role.'
         )
       );
 

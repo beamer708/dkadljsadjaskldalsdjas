@@ -10,18 +10,18 @@ const {
   MessageFlags,
 } = require('discord.js');
 
-// Sends the Components v2 Unity Vault support panel with a Get Assistance button
+// Sends the Components v2 @howtoerlc support panel with a Get Assistance button
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('open-ticket')
-    .setDescription('Opens the Unity Vault support panel'),
+    .setDescription('Opens the @howtoerlc support panel'),
 
   async execute(interaction) {
     const container = new ContainerBuilder()
-      .setAccentColor(0xF5F0E8)
+      .setAccentColor(0x52D973)
       // Section 1 — Header
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('## Unity Vault')
+        new TextDisplayBuilder().setContent('## @howtoerlc')
       )
       // Separator
       .addSeparatorComponents(
@@ -34,7 +34,7 @@ module.exports = {
         new SectionBuilder()
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-              'Having an issue with the **Unity Vault website** or need help with something in the server?\n\nPress **Get Assistance** below to open a support ticket.\nA staff member will be with you shortly.'
+              'Having an issue with the **@howtoerlc website** or need help with something in the server?\n\nPress **Get Assistance** below to open a support ticket.\nA staff member will be with you shortly.'
             )
           )
           .setButtonAccessory(
@@ -52,7 +52,7 @@ module.exports = {
       )
       // Section 4 — Footer subtext
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('-# Helping ERLC communities grow smarter.')
+        new TextDisplayBuilder().setContent('-# @howtoerlc — Built for ERLC communities that mean business.')
       );
 
     // Send the panel directly to the channel

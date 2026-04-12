@@ -29,7 +29,8 @@ const OPTIONAL_FIELDS = [
   'staffRoleId', 'supportCategoryId',
   'logChannelId', 'joinGateChannelId', 'ticketLogChannelId', 'ticketTranscriptChannelId',
   'updatesChannelId', 'updatesPingRoleId',
-  'applicationChannelId', 'suggestionChannelId', 'communityTeamRoleId', 'betaTesterRoleId',
+  'staffForumChannelId', 'suggestionForumChannelId',
+  'communityTeamRoleId', 'betaTesterRoleId',
   'partnershipChannelId', 'rolePanelChannelId', 'welcomeChannelId',
   'notificationsRoleId', 'updatesRoleId', 'serverNewsRoleId',
 ]

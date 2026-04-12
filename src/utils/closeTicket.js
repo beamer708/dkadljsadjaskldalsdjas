@@ -31,7 +31,7 @@ async function closeTicket(channel, ticketId, closedByUser, client) {
   if (openerUser) {
     try {
       const resolvedDm = new ContainerBuilder()
-        .setAccentColor(0xF5F0E8)
+        .setAccentColor(0x52D973)
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent('## Ticket Resolved')
         )
@@ -48,7 +48,7 @@ async function closeTicket(channel, ticketId, closedByUser, client) {
           new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
         )
         .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent('-# Unity Vault • Helping ERLC communities grow smarter.')
+          new TextDisplayBuilder().setContent('-# @howtoerlc — Built for ERLC communities that mean business.')
         );
       await openerUser.send({ components: [resolvedDm], flags: MessageFlags.IsComponentsV2 });
     } catch {
@@ -58,7 +58,7 @@ async function closeTicket(channel, ticketId, closedByUser, client) {
 
   // STEP 2 — Send loading message to the ticket channel
   const loadingContainer = new ContainerBuilder()
-    .setAccentColor(0xF5F0E8)
+    .setAccentColor(0x52D973)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent('## Closing Ticket')
     )
@@ -92,7 +92,7 @@ async function closeTicket(channel, ticketId, closedByUser, client) {
   // STEP 4 — Edit loading message to closed confirmation
   if (loadingMsg) {
     const closedContainer = new ContainerBuilder()
-      .setAccentColor(0xF5F0E8)
+      .setAccentColor(0x52D973)
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent('## Ticket Closed')
       )
@@ -101,7 +101,7 @@ async function closeTicket(channel, ticketId, closedByUser, client) {
       )
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          'This ticket has been closed.\nThank you for reaching out to Unity Vault.'
+          'This ticket has been closed.\nThank you for reaching out to @howtoerlc.'
         )
       )
       .addSeparatorComponents(
@@ -109,7 +109,7 @@ async function closeTicket(channel, ticketId, closedByUser, client) {
       )
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          '-# Unity Vault • Helping ERLC communities grow smarter.'
+          '-# @howtoerlc — Built for ERLC communities that mean business.'
         )
       );
 

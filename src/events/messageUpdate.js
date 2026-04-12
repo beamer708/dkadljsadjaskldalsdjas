@@ -32,7 +32,7 @@ module.exports = {
     const now = Math.floor(Date.now() / 1000);
 
     const container = new ContainerBuilder()
-      .setAccentColor(0xF5F0E8)
+      .setAccentColor(0x111111)
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent('## Message Edited')
       )

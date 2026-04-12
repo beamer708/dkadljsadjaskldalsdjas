@@ -64,7 +64,7 @@ module.exports = {
 
     // Build the ticket embed
     const ticketEmbed = new EmbedBuilder()
-      .setColor(0xF5F0E8)
+      .setColor(0x52D973)
       .setTitle(`Support Ticket — ${ticketId}`)
       .addFields(
         { name: 'User', value: `${member.user.tag} (<@${member.user.id}>)`, inline: true },
@@ -72,7 +72,7 @@ module.exports = {
         { name: 'Status', value: '🟢 Open', inline: true },
         { name: 'Opened', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
       )
-      .setFooter({ text: 'Unity Vault Support' })
+      .setFooter({ text: '@howtoerlc Support' })
       .setTimestamp();
 
     // Build the action row with Resolve and Escalate buttons
@@ -96,7 +96,7 @@ module.exports = {
     // DM the ticket opener
     try {
       const dmContainer = new ContainerBuilder()
-        .setAccentColor(0xF5F0E8)
+        .setAccentColor(0x52D973)
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent('## Ticket Opened')
         )
@@ -105,7 +105,7 @@ module.exports = {
         )
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
-            'Your support ticket has been opened with the Unity Vault team.\n' +
+            'Your support ticket has been opened with the @howtoerlc team.\n' +
             'A staff member will be with you shortly.'
           )
         )
@@ -113,7 +113,7 @@ module.exports = {
           new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
         )
         .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent('-# Unity Vault • Helping ERLC communities grow smarter.')
+          new TextDisplayBuilder().setContent('-# @howtoerlc — Built for ERLC communities that mean business.')
         );
       await member.user.send({ components: [dmContainer], flags: MessageFlags.IsComponentsV2 });
     } catch {

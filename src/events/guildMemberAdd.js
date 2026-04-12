@@ -58,10 +58,10 @@ module.exports = {
         const welcomeChannel = await member.client.channels.fetch(welcomeChannelId);
         if (welcomeChannel) {
           const welcomeContainer = new ContainerBuilder()
-            .setAccentColor(0xF5F0E8)
+            .setAccentColor(0x52D973)
             .addTextDisplayComponents(
               new TextDisplayBuilder().setContent(
-                `## Welcome to Unity Vault\nHey <@${user.id}>, glad to have you here.`
+                `## Welcome to @howtoerlc\nHey <@${user.id}>, glad to have you here.`
               )
             )
             .addSeparatorComponents(
@@ -85,7 +85,7 @@ module.exports = {
             )
             .addTextDisplayComponents(
               new TextDisplayBuilder().setContent(
-                '-# Unity Vault • Helping ERLC communities grow smarter.'
+                '-# @howtoerlc — Built for ERLC communities that mean business.'
               )
             );
 

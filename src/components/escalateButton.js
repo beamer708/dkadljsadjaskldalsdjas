@@ -1,4 +1,5 @@
 const {
+  EmbedBuilder,
   ContainerBuilder,
   TextDisplayBuilder,
   SeparatorBuilder,
@@ -43,7 +44,7 @@ module.exports = {
     // Build the escalation container
     const now = Math.floor(Date.now() / 1000);
     const escalateContainer = new ContainerBuilder()
-      .setAccentColor(0xF5F0E8)
+      .setAccentColor(0x52D973)
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent('## Ticket Escalated')
       )
@@ -62,7 +63,7 @@ module.exports = {
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('-# Unity Vault • Staff have been notified.')
+        new TextDisplayBuilder().setContent('-# @howtoerlc • Staff have been notified.')
       );
 
     // Ping staff role as a plain message, then send the container

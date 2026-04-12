@@ -1,22 +1,53 @@
 {
   "clientId": "1485339891079577880",
   "guildId": "1205037574087770175",
+
+  "_rolesNote": "staffRoleId is used for permission checks throughout the bot. adminRoleId is for admin-only features.",
   "staffRoleId": "1485009683671552010",
+  "adminRoleId": "",
+
+  "_ticketsNote": "supportCategoryId is the category where ticket channels are created. ticketCategoryId is an alias — set both to the same value.",
   "supportCategoryId": "1485344810515562557",
-  "logChannelId": "1485351323816956064",
-  "joinGateChannelId": "1485352897150713916",
+  "ticketCategoryId": "",
   "ticketLogChannelId": "1485352003436544030",
   "ticketTranscriptChannelId": "1485352031471272156",
+
+  "_loggingNote": "logChannelId receives action/moderation logs. joinGateChannelId receives join/leave logs.",
+  "logChannelId": "1485351323816956064",
+  "joinGateChannelId": "1485352897150713916",
+
+  "_welcomeNote": "welcomeChannelId is where the welcome message is sent on member join.",
+  "welcomeChannelId": "1483615235154903232",
+
+  "_forumsNote": "staffForumChannelId and suggestionForumChannelId must be Discord Forum channel IDs (not text channels).",
+  "_staffForumNote": "Set to the ID of the forum channel for staff applications. Must be a forum channel not a text channel.",
+  "staffForumChannelId": "",
+  "_suggestionForumNote": "Set to the ID of the forum channel for suggestions. Must be a forum channel not a text channel.",
+  "suggestionForumChannelId": "",
+
+  "_partnershipNote": "partnershipChannelId receives partnership application panels.",
+  "partnershipChannelId": "1485482768917074142",
+
+  "_resourcesNote": "Set resourcesChannelId to the channel where resource releases are posted. Set resourcesPingRoleId to the role to ping.",
+  "resourcesChannelId": "",
+  "resourcesPingRoleId": "",
+
+  "_updatesNote": "updatesChannelId and updatesPingRoleId control where website update announcements go. updateChannelId and updatePingRoleId are aliases.",
   "updatesChannelId": "1485008114339283174",
   "updatesPingRoleId": "1485363206116348164",
-  "applicationChannelId": "1485394744321245214",
-  "suggestionChannelId": "1485394815788257481",
-  "partnershipChannelId": "1485482768917074142",
+  "updateChannelId": "",
+  "updatePingRoleId": "",
+
+  "_rolePanelNote": "rolePanelChannelId is where the /role-panel command posts.",
   "rolePanelChannelId": "1485008262821843225",
-  "welcomeChannelId": "1483615235154903232",
-  "communityTeamRoleId": "1485009683671552010",
-  "betaTesterRoleId": "1485009683671552010",
+
+  "_notificationRolesNote": "These three roles are toggled by the role panel and about panel select menu.",
   "notificationsRoleId": "1485745906539302972",
   "updatesRoleId": "1485745951451775211",
-  "serverNewsRoleId": "1485746083635400954"
+  "serverNewsRoleId": "1485746083635400954",
+
+  "_appRolesNote": "communityTeamRoleId and betaTesterRoleId are assigned on application acceptance. betaRoleId is an alias for betaTesterRoleId.",
+  "communityTeamRoleId": "1485009683671552010",
+  "betaTesterRoleId": "1485009683671552010",
+  "betaRoleId": ""
 }

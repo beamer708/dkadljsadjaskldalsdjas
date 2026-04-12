@@ -13,11 +13,11 @@ const {
 } = require('discord.js');
 const { isStaff } = require('../utils/permissionCheck');
 
-// Sends the static Unity Vault about panel to the channel — staff only
+// Sends the static @howtoerlc about panel to the channel — staff only
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('about-panel')
-    .setDescription('Post the Unity Vault about panel to this channel'),
+    .setDescription('Post the @howtoerlc about panel to this channel'),
 
   async execute(interaction) {
     console.log('about-panel command executed');
@@ -29,11 +29,11 @@ module.exports = {
     }
 
     const container = new ContainerBuilder()
-      .setAccentColor(0xF5F0E8)
+      .setAccentColor(0x52D973)
       // Section 1 — Header
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          '## Unity Vault\nThe resource vault built for the ERLC community.'
+          '## @howtoerlc\nA curated resource vault built for ERLC communities that mean business.'
         )
       )
       .addSeparatorComponents(
@@ -102,7 +102,7 @@ module.exports = {
       )
       // Section 5 — Footer
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('-# Helping ERLC communities grow smarter.')
+        new TextDisplayBuilder().setContent('-# @howtoerlc — Built for ERLC communities that mean business.')
       );
 
     // Send the panel to the channel

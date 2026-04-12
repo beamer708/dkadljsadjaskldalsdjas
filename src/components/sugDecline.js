@@ -46,7 +46,7 @@ module.exports = {
 
     // DM the submitter
     const dmContainer = new ContainerBuilder()
-      .setAccentColor(0xF5F0E8)
+      .setAccentColor(0x111111)
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent('## Suggestion Update')
       )
@@ -55,7 +55,7 @@ module.exports = {
       )
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `Thank you for submitting your suggestion to Unity Vault.\n\n` +
+          `Thank you for submitting your suggestion to @howtoerlc.\n\n` +
           `After review, we have decided not to move forward with **${title}** (${suggestionId}) at this time.\n` +
           `We appreciate your input and encourage you to share future ideas.`
         )
@@ -64,7 +64,7 @@ module.exports = {
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('-# Unity Vault • Helping ERLC communities grow smarter.')
+        new TextDisplayBuilder().setContent('-# @howtoerlc — Built for ERLC communities that mean business.')
       );
 
     try {

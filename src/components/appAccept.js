@@ -59,7 +59,7 @@ module.exports = {
 
     // DM the applicant
     const dmContainer = new ContainerBuilder()
-      .setAccentColor(0xF5F0E8)
+      .setAccentColor(0x52D973)
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent('## Application Accepted')
       )
@@ -68,7 +68,7 @@ module.exports = {
       )
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `Congratulations. Your application to Unity Vault has been accepted.\n\n` +
+          `Congratulations. Your application to @howtoerlc has been accepted.\n\n` +
           `You have been given the **${roleApplying}** role.\n` +
           `Welcome to the team.`
         )
@@ -77,7 +77,7 @@ module.exports = {
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('-# Unity Vault • Helping ERLC communities grow smarter.')
+        new TextDisplayBuilder().setContent('-# @howtoerlc — Built for ERLC communities that mean business.')
       );
 
     try {

@@ -39,7 +39,7 @@ module.exports = {
 
     // DM the applicant
     const dmContainer = new ContainerBuilder()
-      .setAccentColor(0xF5F0E8)
+      .setAccentColor(0x111111)
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent('## Application Update')
       )
@@ -48,7 +48,7 @@ module.exports = {
       )
       .addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `Thank you for your interest in Unity Vault.\n\n` +
+          `Thank you for your interest in @howtoerlc.\n\n` +
           `After careful review, we are unable to move forward with your application at this time.\n` +
           `You are welcome to apply again in the future.`
         )
@@ -57,7 +57,7 @@ module.exports = {
         new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
       )
       .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('-# Unity Vault • Helping ERLC communities grow smarter.')
+        new TextDisplayBuilder().setContent('-# @howtoerlc — Built for ERLC communities that mean business.')
       );
 
     try {
